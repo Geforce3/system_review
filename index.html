@@ -584,7 +584,14 @@ tbody tr:last-child td{border-bottom:none}
 
   <div id="synth-out-card" class="card" style="display:none;">
     <div class="card-title">📝 Synthesis Output
-      <button class="btn btn-sm btn-secondary" style="margin-left:auto;" onclick="copyRaw()">📋 Copy Raw Markdown</button>
+      <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-secondary" onclick="copyRaw()">📋 Copy</button>
+        <button class="btn btn-sm btn-secondary" onclick="downloadSynthesis('md')" title="Download as Markdown">⬇ .md</button>
+        <button class="btn btn-sm btn-secondary" onclick="downloadSynthesis('txt')" title="Download as plain text">⬇ .txt</button>
+        <button class="btn btn-sm btn-secondary" onclick="downloadSynthesis('html')" title="Download as HTML">⬇ HTML</button>
+        <button class="btn btn-sm btn-secondary" onclick="downloadSynthesis('doc')" title="Download as Word document">⬇ Word</button>
+        <button class="btn btn-sm btn-secondary" onclick="printSynthesisPdf()" title="Save as PDF via browser print dialog">⬇ PDF</button>
+      </div>
     </div>
     <div class="synth-out" id="synth-rendered"></div>
   </div>
@@ -1526,6 +1533,105 @@ function copyRaw() {
   navigator.clipboard.writeText(state.rawSynthesis)
     .then(()=>showToast('Copied to clipboard.','success'))
     .catch(()=>showToast('Copy failed — please copy manually.','error'));
+}
+
+// ── Synthesis export helpers ──────────────────────────────────────
+// Shared inline CSS for HTML / Word / PDF exports
+function synthExportStyles(forWord){
+  return forWord
+    ? `body{font-family:Calibri,sans-serif;font-size:11pt;margin:2cm}
+h1{font-size:16pt;color:#1e3a5f}h2{font-size:13pt;color:#1e3a5f}h3{font-size:12pt}
+p{line-height:1.5;margin-bottom:6pt}
+table{border-collapse:collapse;width:100%}
+th{background:#1e3a5f;color:#fff;padding:5pt 8pt;font-size:10pt;text-align:left}
+td,th{border:1pt solid #ccc;padding:5pt 8pt;font-size:10pt;vertical-align:top}
+ul,ol{margin:6pt 0 6pt 18pt}li{margin-bottom:3pt}`
+    : `body{font-family:system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 24px;color:#1a1a1a}
+h1,h2,h3{color:#1e3a5f}h1{font-size:18px}h2{font-size:16px}h3{font-size:14px}
+p{line-height:1.7;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th{background:#1e3a5f;color:#fff;padding:7px 11px;font-size:13px;text-align:left}
+td{border:1px solid #ddd;padding:7px 11px;font-size:13px;vertical-align:top}
+hr{border:none;border-top:1px solid #ddd;margin:16px 0}
+ul,ol{margin:8px 0 8px 20px}li{margin-bottom:4px}`;
+}
+
+// The rendered HTML is produced by renderMarkdown() which HTML-escapes all
+// user/AI content before insertion — safe to read back for export.
+function synthRenderedHtml(){ return document.getElementById('synth-rendered').innerHTML; }
+
+function downloadSynthesis(fmt){
+  if(!state.rawSynthesis){ showToast('No synthesis to download.','error'); return; }
+  const q=state.query||'synthesis';
+  const slug=q.slice(0,40).replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+
+  if(fmt==='md'){
+    dlFile(state.rawSynthesis,`synthesis-${slug}.md`,'text/markdown;charset=utf-8');
+    showToast('Markdown downloaded.','success');
+    return;
+  }
+
+  if(fmt==='txt'){
+    const txt=state.rawSynthesis
+      .replace(/^#{1,3} /gm,'')
+      .replace(/\*\*\*(.+?)\*\*\*/g,'$1')
+      .replace(/\*\*(.+?)\*\*/g,'$1')
+      .replace(/\*(.+?)\*/g,'$1')
+      .replace(/^\|.+\|$/gm,l=>l.replace(/\s*\|\s*/g,'\t').replace(/^\t|\t$/g,''))
+      .replace(/^\s*[-|: ]+\s*$/gm,'')
+      .replace(/^---+$/gm,'\u2500'.repeat(40));
+    dlFile(txt,`synthesis-${slug}.txt`,'text/plain;charset=utf-8');
+    showToast('Plain text downloaded.','success');
+    return;
+  }
+
+  if(fmt==='html'){
+    const body=synthRenderedHtml();
+    const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Synthesis \u2014 ${esc(q)}</title><style>${synthExportStyles(false)}</style></head>
+<body>${body}</body></html>`;
+    dlFile(html,`synthesis-${slug}.html`,'text/html;charset=utf-8');
+    showToast('HTML downloaded.','success');
+    return;
+  }
+
+  if(fmt==='doc'){
+    const body=synthRenderedHtml();
+    const doc=`<html xmlns:o='urn:schemas-microsoft-com:office:office'
+ xmlns:w='urn:schemas-microsoft-com:office:word'
+ xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>Synthesis</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>
+<w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<style>${synthExportStyles(true)}</style></head>
+<body>${body}</body></html>`;
+    dlFile(doc,`synthesis-${slug}.doc`,'application/msword');
+    showToast('Word document downloaded.','success');
+  }
+}
+
+function printSynthesisPdf(){
+  if(!state.rawSynthesis){ showToast('No synthesis to print.','error'); return; }
+  const q=state.query||'synthesis';
+  const body=synthRenderedHtml();
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Synthesis \u2014 ${esc(q)}</title>
+<style>${synthExportStyles(false)}
+@media print{body{margin:1.5cm}table{page-break-inside:avoid}}</style></head>
+<body>${body}</body></html>`;
+
+  const iframe=document.createElement('iframe');
+  iframe.style.cssText='position:fixed;width:0;height:0;border:0;top:-9999px;left:-9999px';
+  document.body.appendChild(iframe);
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+  iframe.contentWindow.focus();
+  // Small delay lets the iframe render before triggering the browser print dialog
+  setTimeout(()=>{
+    iframe.contentWindow.print();
+    setTimeout(()=>{ if(iframe.parentNode) iframe.parentNode.removeChild(iframe); },2000);
+  },300);
 }
 
 // ── Markdown renderer ────────────────────────────────────────────

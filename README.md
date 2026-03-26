@@ -9,7 +9,7 @@ A browser-based tool for conducting systematic literature reviews across multipl
 - **Stage 2 — AI Screening**: Claude auto-screens papers against editable inclusion/exclusion criteria; pause/stop/manual override supported
 - **Stage 3 — Export**: PRISMA 2020 visual flowchart (Identification → Screening → Included) with per-database breakdown; exclusion reason analysis with percentage bars; download results as CSV or RIS
 - **PRISMA Narrative**: Generate a template narrative (no AI tokens) or an AI-written formal PRISMA methods paragraph (Claude Sonnet) ready to copy into your paper. Includes a "Learn about PRISMA" guide.
-- **Stage 4 — Synthesis**: Generate a structured narrative synthesis and evidence table from included papers
+- **Stage 4 — Synthesis**: Generate a structured narrative synthesis and evidence table from included papers; download as Markdown, Plain text, HTML, Word (.doc), or PDF
 - **Deduplication**: Papers appearing in multiple databases are automatically merged
 - **Session save/restore**: Export and reimport your screening session as JSON (API keys excluded)
 - **Navigation**: Clickable step indicators let you jump back to any stage you've visited; "← Back to Search" on Stage 2 lets you run an additional query (merge or clear); "🔄 New Search" in the header restarts from scratch at any point (API keys preserved)

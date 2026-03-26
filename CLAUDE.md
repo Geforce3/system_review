@@ -150,6 +150,16 @@ This is a systematic literature review assistant that works entirely in the brow
 
 ## Implementation Notes
 
+### Synthesis Export
+- `state.rawSynthesis` holds the raw markdown string; `#synth-rendered` holds the HTML-rendered version
+- `downloadSynthesis(fmt)` handles `'md'`, `'txt'`, `'html'`, `'doc'` — all reuse the existing `dlFile()` helper
+- `printSynthesisPdf()` injects synthesis HTML into a hidden `<iframe>` and calls `iframe.contentWindow.print()` — no library; user saves via browser print dialog
+- `synthRenderedHtml()` reads `innerHTML` from `#synth-rendered`; this is safe because `renderMarkdown()` HTML-escapes all content before insertion (no unescaped user/AI strings reach the DOM)
+- `synthExportStyles(forWord)` returns appropriate inline CSS for screen (HTML/PDF) or Word (`.doc`) targets
+- Word export uses the Word HTML trick: HTML with `xmlns:w` namespace + `application/msword` MIME → `.doc` extension — opens and edits in Word, LibreOffice, Google Docs; no JS library needed
+- Plain text export strips markdown syntax (headings, bold/italic, table pipes) via regex before download
+- Filename slug is derived from `state.query` (max 40 chars, alphanumeric + hyphens) — never from AI output
+
 ### Claude API Format
 - Direct browser fetch to: `https://api.anthropic.com/v1/messages`
 - Messages format with system prompt and user content
