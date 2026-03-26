@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Project Context
-This is a systematic literature review assistant that works entirely in the browser. It integrates with PubMed E-utilities API (free, no key required) and Claude API (key required) to help researchers screen, export, and synthesise academic papers.
+This is a systematic literature review assistant that works entirely in the browser. It integrates with multiple academic databases and Claude API (key required) to help researchers search, screen, export, and synthesise academic papers.
 
 ## Critical Rules
 
@@ -27,12 +27,50 @@ This is a systematic literature review assistant that works entirely in the brow
 ### Data Handling
 - API key stored in memory only — NEVER persist to localStorage, sessionStorage, or cookies
 - Paper data persists in JavaScript memory during session
-- App logic is entirely client-side; `server.js` is a thin static file server only
+- App logic is entirely client-side; `server.js` is a thin static file server + Semantic Scholar proxy only
+
+## Databases
+
+### PubMed (NCBI E-utilities)
+- No key required; NCBI API key optional (increases rate limit from 3→10 req/s)
+- Search: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<query>&retmax=<count>&retmode=xml`
+- Fetch: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<ids>&retmode=xml`
+- Fetch in chunks of 200 PMIDs at a time
+- Response format: XML — parse with DOMParser, handle missing/multiple AbstractText sections
+
+### Europe PMC
+- No key required
+- Search + fields in one call: `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=<q>&format=json&pageSize=<n>&resultType=core&cursorMark=<cursor>`
+- Use cursor-based pagination; initial cursorMark is `*`
+- Response format: JSON — `response.resultList.result[]`
+- Abstract field: `result.abstractText` (may be absent)
+- Authors: `result.authorList.author[]` each with `lastName`, `initials`
+- DOI: `result.doi`
+
+### OpenAlex
+- Free API key required since Feb 2026 — users must register at https://openalex.org/getting-started
+- Provide email as API key (polite pool) or registered key via `api_key` param
+- Search endpoint: `https://api.openalex.org/works?search=<q>&per-page=<n>&page=<p>&select=id,title,authorships,publication_year,primary_location,abstract_inverted_index,ids&mailto=<email>`
+- Response format: JSON — `data.results[]`
+- Abstract: stored as inverted index `{word: [positions]}` — must reconstruct with `reconstructOAAbstract()`
+- DOI: `result.ids.doi` (full URL like `https://doi.org/10.xxx`) — strip prefix when storing
+- Journal: `result.primary_location.source.display_name`
+- Authors: `result.authorships[].author.display_name`
+
+### Semantic Scholar
+- **CORS-blocked for direct browser calls** — requires server-side proxy
+- Cannot be used when app is opened as a local file (`file://` protocol)
+- Server proxy route: `GET /api/semantic-scholar?query=<q>&limit=<n>&apiKey=<k>`
+- Proxy forwards to: `https://api.semanticscholar.org/graph/v1/paper/search`
+- Fields requested: `title,authors,year,abstract,externalIds,journal,publicationVenue`
+- No key required for basic use; optional S2 API key increases rate limits
+- SSRF prevention: hostname hardcoded in server.js, never taken from client input
+- Timeout: 15 seconds
 
 ## Deployment (Railway)
 
 ### Server
-- `server.js` — minimal Express server, serves only `index.html` at `/`, blocks all other paths
+- `server.js` — minimal Express server, serves only `index.html` at `/`, blocks all other paths, proxies Semantic Scholar
 - `package.json` — declares `express` and `express-basic-auth` as the only dependencies
 - `railway.json` — Railway build/deploy config (nixpacks builder, `npm start`)
 
@@ -48,6 +86,16 @@ This is a systematic literature review assistant that works entirely in the brow
 - Only `index.html` is served; CLAUDE.md, README.md, and all other files return 404
 - Railway enforces HTTPS — Basic Auth credentials are always encrypted in transit
 - No user data is ever stored server-side; all processing is client-side in the browser
+- DOI links validated against `/^10\.\d{4,}\/\S+$/` before constructing `https://doi.org/` URLs (open redirect prevention)
+- Error messages escaped with `esc()` before DOM insertion (XSS prevention)
+- Semantic Scholar proxy: limit clamped server-side to max 100, API keys not logged
+
+### Deduplication
+- Papers from multiple databases are deduplicated in two passes:
+  1. By normalized DOI (lowercased, `https://doi.org/` prefix stripped)
+  2. By normalized title (lowercased, punctuation stripped, min 10 chars)
+- First database to return a paper wins; subsequent duplicates are discarded
+- Source badges show original database(s) on each paper row
 
 ### Common Bugs to Avoid
 
@@ -75,11 +123,16 @@ This is a systematic literature review assistant that works entirely in the brow
    - Automatically exclude from AI screening
    - Still allow export but note the limitation
 
-## Implementation Notes
+6. **OpenAlex Abstract Reconstruction**
+   - `abstract_inverted_index` maps words to arrays of positions
+   - Reconstruct by creating an array indexed by position, filling in words, then joining
+   - May be null for some records — handle gracefully
 
-### PubMed E-utilities
-- Search: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<query>&retmax=<count>&retmode=xml`
-- Fetch: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<ids>&retmode=xml`
+7. **Semantic Scholar Local File**
+   - Detect `window.location.protocol === 'file:'` and disable S2 checkbox
+   - Show clear warning that S2 requires server deployment
+
+## Implementation Notes
 
 ### Claude API Format
 - Direct browser fetch to: `https://api.anthropic.com/v1/messages`
@@ -88,7 +141,10 @@ This is a systematic literature review assistant that works entirely in the brow
 
 ### UI Requirements
 - 4 clear stages with step indicator at top
+- Database selector in Stage 1 with per-DB status indicators
 - Progress bar and counter during screening
-- Color-coded decision badges (green/red/yellow)
+- Color-coded decision badges (green/red/yellow/grey)
+- Source badges on paper rows showing originating database
 - Expandable abstract rows
 - Clean, professional light color scheme
+- Per-database breakdown in PRISMA flow section
