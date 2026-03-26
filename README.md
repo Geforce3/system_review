@@ -10,6 +10,7 @@ A browser-based tool for conducting systematic literature reviews across multipl
 - **Stage 4 — Synthesis**: Generate a structured narrative synthesis and evidence table from included papers
 - **Deduplication**: Papers appearing in multiple databases are automatically merged
 - **Session save/restore**: Export and reimport your screening session as JSON (API keys excluded)
+- **Navigation**: Clickable step indicators let you jump back to any stage you've visited; "← Back to Search" on Stage 2 lets you run an additional query (merge or clear); "🔄 New Search" in the header restarts from scratch at any point (API keys preserved)
 
 ---
 

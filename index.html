@@ -46,6 +46,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn-hdr{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;transition:background .2s;white-space:nowrap}
 .btn-hdr:hover{background:rgba(255,255,255,.25)}
 .btn-hdr:disabled{opacity:.4;cursor:not-allowed}
+.btn-hdr-danger{background:rgba(220,38,38,.25);border-color:rgba(220,38,38,.5)}.btn-hdr-danger:hover{background:rgba(220,38,38,.4)}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:#fff;border-radius:10px;padding:28px 28px 22px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.modal-title{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.modal-body{font-size:14px;color:var(--text);line-height:1.55;margin-bottom:20px}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+/* Clickable steps */
+.step.clickable{cursor:pointer}.step.clickable:hover .step-num{opacity:.8}
+
 .file-label{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:13px;cursor:pointer;transition:background .2s;white-space:nowrap}
 .file-label:hover{background:rgba(255,255,255,.25)}
 input[type="file"]{display:none}
@@ -204,16 +217,17 @@ tbody tr:last-child td{border-bottom:none}
     <span class="header-title">Systematic Review Assistant</span>
 
   <nav class="step-indicator">
-    <div class="step active" id="step-1"><div class="step-num">1</div><span class="step-label">Search</span></div>
+    <div class="step active" id="step-1" onclick="stepClick(1)" title="Back to Search"><div class="step-num">1</div><span class="step-label">Search</span></div>
     <div class="step-conn"></div>
-    <div class="step" id="step-2"><div class="step-num">2</div><span class="step-label">Screen</span></div>
+    <div class="step" id="step-2" onclick="stepClick(2)" title="Go to Screen"><div class="step-num">2</div><span class="step-label">Screen</span></div>
     <div class="step-conn"></div>
-    <div class="step" id="step-3"><div class="step-num">3</div><span class="step-label">Export</span></div>
+    <div class="step" id="step-3" onclick="stepClick(3)" title="Go to Export"><div class="step-num">3</div><span class="step-label">Export</span></div>
     <div class="step-conn"></div>
-    <div class="step" id="step-4"><div class="step-num">4</div><span class="step-label">Synthesise</span></div>
+    <div class="step" id="step-4" onclick="stepClick(4)" title="Go to Synthesise"><div class="step-num">4</div><span class="step-label">Synthesise</span></div>
   </nav>
 
   <div class="header-actions">
+    <button class="btn-hdr btn-hdr-danger" id="btn-restart" onclick="confirmRestart()" title="Clear everything and start a new search">🔄 New Search</button>
     <button class="btn-hdr" id="btn-save" disabled onclick="saveSession()">💾 Save Session</button>
     <label class="file-label">📂 Load Session<input type="file" id="session-input" accept=".json" onchange="loadSession(this)"></label>
   </div>
@@ -370,6 +384,7 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 
   <div class="btn-group">
+    <button class="btn btn-secondary" onclick="confirmBackToSearch()">← Back to Search</button>
     <button class="btn btn-primary" onclick="goToStage(3)">Continue to Export →</button>
   </div>
 </section>
@@ -450,6 +465,15 @@ tbody tr:last-child td{border-bottom:none}
 
 </main>
 
+<!-- Confirmation modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-body">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-body"  id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
 <!-- Override menu -->
 <div class="override-menu" id="override-menu">
   <button class="ov-opt ov-inc" onclick="applyOverride('include')">✅ Include</button>
@@ -471,7 +495,7 @@ const state = {
   apiKey:'', ncbiKey:'', query:'', maxResults:100,
   papers:[], criteria:'', batchSize:10,
   screeningActive:false, screeningPaused:false, stopRequested:false,
-  screenedCount:0, rawSynthesis:'', currentStage:1
+  screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1
 };
 let overridePmid = null;
 
@@ -1165,11 +1189,15 @@ function renderMarkdown(md) {
 function goToStage(n) {
   document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
   document.getElementById(`stage-${n}`).classList.add('active');
+  // Track highest stage reached for clickable steps
+  if(n > (state.maxStageReached||1)) state.maxStageReached = n;
   for(let i=1;i<=4;i++){
     const s=document.getElementById(`step-${i}`);
-    s.classList.remove('active','done');
+    s.classList.remove('active','done','clickable');
     if(i<n) s.classList.add('done');
     else if(i===n) s.classList.add('active');
+    // Mark steps clickable if already visited
+    if(i <= (state.maxStageReached||1) && i !== n) s.classList.add('clickable');
   }
   state.currentStage=n;
   if(n===3){ renderPrisma(); renderExportTable(); }
@@ -1179,6 +1207,124 @@ function goToStage(n) {
       `${inc} paper${inc!==1?'s':''} marked as included will be synthesised using Claude Sonnet (most capable model).`;
   }
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function stepClick(n){
+  // Step 1 always goes through confirmBackToSearch if papers exist
+  if(n===1){
+    if(state.papers.length>0) confirmBackToSearch();
+    else goToStage(1);
+    return;
+  }
+  if(n <= (state.maxStageReached||1)) goToStage(n);
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────
+function showModal(title, body, buttons){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+  const act = document.getElementById('modal-actions');
+  act.innerHTML = '';
+  buttons.forEach(b=>{
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + (b.cls||'btn-secondary');
+    btn.textContent = b.label;
+    btn.onclick = ()=>{ closeModal(); b.action(); };
+    act.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function closeModal(e){
+  // Close only when clicking the overlay backdrop itself, or called directly (no event arg)
+  if(e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') closeModal();
+});
+
+// ── Restart (clears everything) ───────────────────────────────────
+function confirmRestart(){
+  const hasPapers = state.papers.length > 0;
+  if(!hasPapers){
+    // Nothing to clear — just go to stage 1
+    goToStage(1);
+    return;
+  }
+  showModal(
+    '🔄 Start New Search',
+    'This will <strong>clear all papers, screening decisions, and synthesis</strong>. Your API keys will be preserved.<br><br>Are you sure you want to start over?',
+    [
+      { label: 'Cancel', cls: 'btn-secondary', action: ()=>{} },
+      { label: 'Yes, clear everything', cls: 'btn-danger', action: restartApp }
+    ]
+  );
+}
+
+function restartApp(){
+  // Clear all paper/screening/synthesis state
+  state.papers = [];
+  state.criteria = '';
+  state.rawSynthesis = '';
+  state.query = '';
+  state.maxResults = 100;
+  state.screeningActive = false;
+  state.screeningPaused = false;
+  state.stopRequested = false;
+  state.screenedCount = 0;
+  state.maxStageReached = 1;
+  // Reset UI elements
+  const q = document.getElementById('query');
+  if(q) q.value = '';
+  const ct = document.getElementById('criteria-text');
+  if(ct) ct.value = '';
+  const sr = document.getElementById('synth-rendered');
+  if(sr) sr.innerHTML = '';
+  const pb = document.getElementById('papers-tbody');
+  if(pb) pb.innerHTML = '';
+  const eb = document.getElementById('export-tbody');
+  if(eb) eb.innerHTML = '';
+  document.getElementById('search-status').innerHTML = '';
+  document.getElementById('db-progress').innerHTML = '';
+  document.getElementById('btn-save').disabled = true;
+  // Reset screening buttons
+  const btnScreen = document.getElementById('btn-screen');
+  const btnPause  = document.getElementById('btn-pause');
+  const btnStop   = document.getElementById('btn-stop');
+  if(btnScreen) btnScreen.disabled = false;
+  if(btnPause)  btnPause.disabled  = true;
+  if(btnStop)   btnStop.disabled   = true;
+  updatePapersCount();
+  goToStage(1);
+  showToast('All cleared. Ready for a new search.', 'success');
+}
+
+// ── Back to Search ─────────────────────────────────────────────────
+function confirmBackToSearch(){
+  if(state.papers.length === 0){
+    goToStage(1);
+    return;
+  }
+  showModal(
+    '← Back to Search',
+    'What would you like to do with the <strong>' + state.papers.length + ' paper' + (state.papers.length!==1?'s':'') + '</strong> already retrieved?',
+    [
+      { label: 'Cancel', cls: 'btn-secondary', action: ()=>{} },
+      {
+        label: 'Keep papers — run another search and merge results',
+        cls: 'btn-primary',
+        action: ()=>{ goToStage(1); showToast('New results will be merged with existing papers.', 'info'); }
+      },
+      {
+        label: 'Clear papers — start fresh',
+        cls: 'btn-danger',
+        action: ()=>{ restartApp(); }
+      }
+    ]
+  );
 }
 
 // ── Session save / restore ────────────────────────────────────────

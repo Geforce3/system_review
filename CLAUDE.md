@@ -148,3 +148,12 @@ This is a systematic literature review assistant that works entirely in the brow
 - Expandable abstract rows
 - Clean, professional light color scheme
 - Per-database breakdown in PRISMA flow section
+
+### Navigation
+- **Step indicators** (header) are clickable for any stage the user has already reached (`state.maxStageReached` tracks the highest stage visited)
+- Clicking step 1 when papers exist triggers `confirmBackToSearch()` — user chooses keep or clear
+- **🔄 New Search** button in header is always visible and calls `confirmRestart()` — clears all papers, criteria, synthesis; preserves API keys; resets `maxStageReached` to 1
+- **← Back to Search** button on Stage 2 bottom also calls `confirmBackToSearch()`
+- All destructive navigation goes through a confirmation modal (`showModal()`)
+- Modal closes on Escape key or backdrop click; `aria-labelledby` and `aria-describedby` for accessibility
+- `showModal(title, body, buttons)` — `body` accepts safe HTML strings only; never pass unsanitized user input
