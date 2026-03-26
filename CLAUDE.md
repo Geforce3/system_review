@@ -27,7 +27,27 @@ This is a systematic literature review assistant that works entirely in the brow
 ### Data Handling
 - API key stored in memory only — NEVER persist to localStorage, sessionStorage, or cookies
 - Paper data persists in JavaScript memory during session
-- No backend, no server — everything runs client-side
+- App logic is entirely client-side; `server.js` is a thin static file server only
+
+## Deployment (Railway)
+
+### Server
+- `server.js` — minimal Express server, serves only `index.html` at `/`, blocks all other paths
+- `package.json` — declares `express` and `express-basic-auth` as the only dependencies
+- `railway.json` — Railway build/deploy config (nixpacks builder, `npm start`)
+
+### Password Protection
+- HTTP Basic Auth is enforced at the server level before any content is served
+- Credentials are stored **only** as Railway environment variables — never in code
+- Required env vars (set in Railway dashboard):
+  - `AUTH_USER` — the login username
+  - `AUTH_PASS` — the login password
+- Server exits immediately on startup if either env var is missing
+
+### Security Notes
+- Only `index.html` is served; CLAUDE.md, README.md, and all other files return 404
+- Railway enforces HTTPS — Basic Auth credentials are always encrypted in transit
+- No user data is ever stored server-side; all processing is client-side in the browser
 
 ### Common Bugs to Avoid
 

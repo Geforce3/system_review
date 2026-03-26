@@ -1,0 +1,15 @@
+{
+  "name": "slr-assistant",
+  "version": "1.0.0",
+  "description": "NUS Libraries Systematic Review Assistant",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-basic-auth": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
