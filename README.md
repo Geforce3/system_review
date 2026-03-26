@@ -22,6 +22,7 @@ A browser-based tool for conducting systematic literature reviews across multipl
 | Europe PMC | No | Life sciences, open access focus |
 | OpenAlex | Yes (free) | Broad academic coverage |
 | Semantic Scholar | No (optional for higher limits) | Requires server deployment |
+| ClinicalTrials.gov | No | Clinical trials registry; works as local file too |
 
 > **Semantic Scholar** uses a server-side proxy to bypass browser CORS restrictions. It is not available when opening the app as a local file — use the Railway deployment instead.
 

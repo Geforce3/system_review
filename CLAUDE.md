@@ -57,6 +57,17 @@ This is a systematic literature review assistant that works entirely in the brow
 - Journal: `result.primary_location.source.display_name`
 - Authors: `result.authorships[].author.display_name`
 
+### ClinicalTrials.gov (NLM/NIH)
+- No key required; **CORS-enabled** — can be called directly from the browser (no proxy needed)
+- Search endpoint: `https://clinicaltrials.gov/api/v2/studies?query.term=<q>&pageSize=<n>&format=json&fields=<fields>`
+- Fields requested: `NCTId,BriefTitle,OfficialTitle,BriefSummary,DetailedDescription,LeadSponsorName,StartDate,CompletionDate,OverallStatus,Condition,InterventionType,InterventionName`
+- Response format: JSON — `data.studies[]`, each with nested `protocolSection` modules
+- Abstract: `protocolSection.descriptionModule.briefSummary` or `detailedDescription`; enriched with conditions and interventions joined as plain text
+- Authors: `protocolSection.sponsorCollaboratorsModule.leadSponsor.name`
+- ID: `protocolSection.identificationModule.nctId` (stored in `pmid` field; format `NCT########`)
+- No DOI field — leave blank
+- Source tag: `ct`; badge class: `src-ct`
+
 ### Semantic Scholar
 - **CORS-blocked for direct browser calls** — requires server-side proxy
 - Cannot be used when app is opened as a local file (`file://` protocol)

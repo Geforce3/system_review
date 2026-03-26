@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'self' https://eutils.ncbi.nlm.nih.gov https://api.anthropic.com https://www.ebi.ac.uk https://api.openalex.org; object-src 'none'; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'self' https://eutils.ncbi.nlm.nih.gov https://api.anthropic.com https://www.ebi.ac.uk https://api.openalex.org https://clinicaltrials.gov; object-src 'none'; base-uri 'none'; form-action 'none';">
 <title>Systematic Review Assistant</title>
 <style>
 :root {
@@ -196,6 +196,7 @@ tbody tr:last-child td{border-bottom:none}
 .db-europepmc{background:#D1FAE5;color:#065F46}
 .db-openalex{background:#EDE9FE;color:#5B21B6}
 .db-s2{background:#FEF3C7;color:#92400E}
+.db-ct{background:#FCE7F3;color:#9D174D}
 .db-desc{font-size:12px;color:var(--muted);line-height:1.4}
 .db-status-row{display:flex;flex-direction:column;gap:4px;margin-top:8px}
 .db-status-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
@@ -205,6 +206,7 @@ tbody tr:last-child td{border-bottom:none}
 .src-europepmc{background:#D1FAE5;color:#065F46}
 .src-openalex{background:#EDE9FE;color:#5B21B6}
 .src-s2{background:#FEF3C7;color:#92400E}
+.src-ct{background:#FCE7F3;color:#9D174D}
 /* Info box */
 .info-box{padding:12px 16px;border-radius:6px;font-size:13px}
 .info-box-warn{background:#FFF7ED;border:1px solid #FED7AA;color:#92400E}
@@ -263,6 +265,11 @@ tbody tr:last-child td{border-bottom:none}
         <input type="checkbox" id="db-s2">
         <span class="db-tag db-s2">Semantic Scholar</span>
         <span class="db-desc" id="s2-desc">AI-enriched multi-discipline database. <strong>Requires server</strong> (Railway or <code>npm start</code>) — not available when opening index.html directly as a file.</span>
+      </label>
+      <label class="db-check" id="lbl-ct">
+        <input type="checkbox" id="db-ct" checked>
+        <span class="db-tag db-ct">ClinicalTrials.gov</span>
+        <span class="db-desc">U.S. registry of 500,000+ clinical trials including results. Essential for clinical intervention reviews. No API key required.</span>
       </label>
     </div>
     <div class="btn-group" style="margin-top:10px;">
@@ -512,7 +519,7 @@ function initDbSelector(){
 }
 
 function toggleAllDbs(on){
-  ['db-pubmed','db-europepmc','db-openalex'].forEach(id=>{
+  ['db-pubmed','db-europepmc','db-openalex','db-ct'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.checked=on;
   });
@@ -535,10 +542,11 @@ async function searchAll(){
   const useEPMC    = document.getElementById('db-europepmc')?.checked;
   const useOA      = document.getElementById('db-openalex')?.checked;
   const useS2      = document.getElementById('db-s2')?.checked && !isLocalFile();
+  const useCT      = document.getElementById('db-ct')?.checked;
 
   if(!query)  { showToast('Please enter a search query.','error'); return; }
   if(!apiKey) { showToast('Please enter your Claude API key.','error'); return; }
-  if(!usePubmed&&!useEPMC&&!useOA&&!useS2){ showToast('Please select at least one database.','error'); return; }
+  if(!usePubmed&&!useEPMC&&!useOA&&!useS2&&!useCT){ showToast('Please select at least one database.','error'); return; }
   if(useOA&&!oaKey){ showToast('OpenAlex requires an API key. Register free at openalex.org/settings/api','error'); return; }
 
   state.apiKey=apiKey; state.ncbiKey=ncbiKey;
@@ -550,7 +558,7 @@ async function searchAll(){
   setStatus('search-status','<span class="spinner"></span> Searching selected databases…');
   document.getElementById('db-progress').innerHTML='';
 
-  const counts={pubmed:0,europepmc:0,openalex:0,s2:0};
+  const counts={pubmed:0,europepmc:0,openalex:0,s2:0,ct:0};
   let allPapers=[];
 
   try {
@@ -579,6 +587,12 @@ async function searchAll(){
       counts.s2=r.length; allPapers.push(...r);
       setDbStatus('s2',`${r.length} found`,'done');
     }
+    if(useCT){
+      setDbStatus('ct','searching');
+      const r=await fetchClinicalTrials(query,maxResults);
+      counts.ct=r.length; allPapers.push(...r);
+      setDbStatus('ct',`${r.length} found`,'done');
+    }
 
     const before=allPapers.length;
     allPapers=deduplicatePapers(allPapers);
@@ -604,9 +618,9 @@ async function searchAll(){
   } finally { btn.disabled=false; }
 }
 
-function dbLabel(db){ return {pubmed:'PubMed',europepmc:'Europe PMC',openalex:'OpenAlex',s2:'Semantic Scholar'}[db]||db; }
-function dbSrcClass(db){ return {pubmed:'src-pubmed',europepmc:'src-europepmc',openalex:'src-openalex',s2:'src-s2'}[db]||''; }
-function srcLabel(s){ const m={pubmed:'PubMed',europepmc:'EPMC',openalex:'OA',s2:'S2'}; return s.split('+').map(x=>m[x]||x).join('+'); }
+function dbLabel(db){ return {pubmed:'PubMed',europepmc:'Europe PMC',openalex:'OpenAlex',s2:'Semantic Scholar',ct:'ClinicalTrials.gov'}[db]||db; }
+function dbSrcClass(db){ return {pubmed:'src-pubmed',europepmc:'src-europepmc',openalex:'src-openalex',s2:'src-s2',ct:'src-ct'}[db]||''; }
+function srcLabel(s){ const m={pubmed:'PubMed',europepmc:'EPMC',openalex:'OA',s2:'S2',ct:'CT.gov'}; return s.split('+').map(x=>m[x]||x).join('+'); }
 
 function setDbStatus(db,msg,state_){
   const row=document.getElementById(`dbst-${db}`);
@@ -718,6 +732,55 @@ async function fetchSemanticScholar(query,maxResults,apiKey){
       abstract: p.abstract||'No abstract available',
       doi, source:'s2',
       aiDecision:'', aiReason:'', manualDecision:''
+    };
+  });
+}
+
+// ── ClinicalTrials.gov fetch ─────────────────────────────────────
+async function fetchClinicalTrials(query, maxResults){
+  const pageSize = Math.min(maxResults, 1000);
+  const fields = 'NCTId,BriefTitle,OfficialTitle,BriefSummary,DetailedDescription,LeadSponsorName,StartDate,CompletionDate,OverallStatus,Condition,InterventionType,InterventionName';
+  const url = `https://clinicaltrials.gov/api/v2/studies?query.term=${encodeURIComponent(query)}&pageSize=${pageSize}&format=json&fields=${encodeURIComponent(fields)}`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(`ClinicalTrials.gov failed (${r.status})`);
+  const data = await r.json();
+  const studies = data.studies || [];
+  return studies.map(s => {
+    const proto  = s.protocolSection || {};
+    const id     = proto.identificationModule || {};
+    const desc   = proto.descriptionModule   || {};
+    const status = proto.statusModule        || {};
+    const sponsor= proto.sponsorCollaboratorsModule || {};
+    const conds  = proto.conditionsModule    || {};
+    const intv   = proto.armsInterventionsModule || {};
+
+    const nctId  = id.nctId || '';
+    const title  = id.briefTitle || id.officialTitle || 'No title';
+    const abstract = desc.briefSummary || desc.detailedDescription || 'No abstract available';
+    const year   = (status.startDateStruct?.date || status.completionDateStruct?.date || '').slice(0, 4);
+    const journal= 'ClinicalTrials.gov';
+    const authors= sponsor.leadSponsor?.name || '';
+    const conditions = (conds.conditions || []).join('; ');
+    const interventions = (intv.interventions || [])
+      .map(i => [i.type, i.name].filter(Boolean).join(': '))
+      .filter(Boolean).join('; ');
+    // Build a richer abstract that includes conditions and interventions
+    const fullAbstract = [
+      abstract,
+      conditions ? `Conditions: ${conditions}` : '',
+      interventions ? `Interventions: ${interventions}` : ''
+    ].filter(Boolean).join('\n\n');
+
+    return {
+      pmid: nctId,
+      title,
+      authors,
+      year,
+      journal,
+      abstract: fullAbstract,
+      doi: '',
+      source: 'ct',
+      aiDecision: '', aiReason: '', manualDecision: ''
     };
   });
 }
