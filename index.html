@@ -141,7 +141,7 @@ tbody tr:last-child td{border-bottom:none}
 .ov-inc{color:var(--inc-txt)}.ov-exc{color:var(--exc-txt)}.ov-unc{color:var(--unc-txt)}
 .ov-rst{color:var(--muted);border-top:1px solid var(--border);margin-top:4px;padding-top:9px}
 
-/* PRISMA */
+/* PRISMA legacy grid (kept for compat) */
 .prisma-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .prisma-box{background:#F8FAFC;border:1px solid var(--border);border-radius:6px;padding:14px 16px;text-align:center}
 .prisma-box.hl{border-color:var(--navy);background:#EFF6FF}
@@ -149,8 +149,51 @@ tbody tr:last-child td{border-bottom:none}
 .prisma-lbl{font-size:12px;color:var(--muted);margin-top:4px;font-weight:500}
 .rsn-table{margin-top:14px}
 .rsn-table h4{font-size:13px;color:var(--text);margin-bottom:8px;font-weight:600}
-.rsn-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #F1F5F9;color:var(--muted)}
-.rsn-n{font-weight:700;color:var(--text)}
+.rsn-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:5px 0;border-bottom:1px solid #F1F5F9;color:var(--muted)}
+.rsn-n{font-weight:700;color:var(--text);flex-shrink:0;margin-left:8px}
+.rsn-bar-wrap{flex:1;margin:0 10px;background:#E5E7EB;border-radius:3px;height:6px;overflow:hidden}
+.rsn-bar{height:100%;background:var(--navy);border-radius:3px;transition:width .3s}
+
+/* PRISMA Flowchart */
+.pf-wrap{max-width:680px;margin:0 auto}
+.pf-phase-lbl{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fff;background:var(--navy);padding:3px 11px;border-radius:12px;margin-bottom:8px}
+.pf-row{display:flex;gap:0;align-items:stretch;margin-bottom:0}
+.pf-col-main{flex:1;min-width:0}
+.pf-col-side{width:220px;flex-shrink:0;display:flex;align-items:center;gap:0}
+.pf-h-connector{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;position:relative}
+.pf-h-connector::after{content:'';display:block;width:100%;height:2px;background:#9CA3AF}
+.pf-h-arrow{width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:8px solid #9CA3AF;flex-shrink:0}
+.pf-box{border:2px solid var(--navy);border-radius:8px;padding:14px 16px;background:#fff;text-align:center}
+.pf-box-excl{border-color:#DC2626;background:#FEF2F2}
+.pf-box-inc{border-color:var(--orange);background:#FFF7ED}
+.pf-box-side{border-color:#9CA3AF;background:#F9FAFB;font-size:13px}
+.pf-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.pf-num{font-size:30px;font-weight:800;color:var(--navy);line-height:1}
+.pf-box-excl .pf-num{color:#DC2626}
+.pf-box-inc .pf-num{color:var(--orange)}
+.pf-box-side .pf-num{font-size:22px;color:#6B7280}
+.pf-sub{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+.pf-v-arrow{height:28px;display:flex;align-items:center;padding-left:calc((100% - 220px)/2 - 1px)}
+.pf-v-arrow-line{width:2px;height:100%;background:var(--navy);position:relative}
+.pf-v-arrow-line::after{content:'';position:absolute;bottom:-7px;left:-5px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--navy)}
+
+/* Strategy card */
+.strategy-card-body{margin-top:4px}
+.strategy-learn{background:#F8FAFC;border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:14px;font-size:13px;line-height:1.7}
+.strategy-learn h4{font-size:13px;font-weight:700;color:var(--navy);margin:10px 0 4px}
+.strategy-learn h4:first-child{margin-top:0}
+.strategy-learn code{background:#E5E7EB;padding:1px 5px;border-radius:3px;font-size:12px}
+.strategy-explanation{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:12px 14px;font-size:13px;line-height:1.6;color:#1E3A5F;margin-bottom:14px}
+.strategy-tips{font-size:12px;color:var(--muted);margin-top:8px}
+.strategy-tips li{margin:2px 0 2px 16px}
+
+/* Narrative */
+.narrative-out{background:#F8FAFC;border:1px solid var(--border);border-radius:6px;padding:16px;font-size:14px;line-height:1.8;color:var(--text);min-height:60px;white-space:pre-wrap}
+.learn-prisma{background:#F8FAFC;border:1px solid var(--border);border-radius:6px;padding:16px;font-size:13px;line-height:1.7;margin-top:14px}
+.learn-prisma h4{font-size:13px;font-weight:700;color:var(--navy);margin:12px 0 4px}
+.learn-prisma h4:first-child{margin-top:0}
+.learn-prisma ul{margin-left:18px}
+.learn-prisma li{margin:2px 0}
 
 /* Synthesis output */
 .synth-out{background:#fff;border:1px solid var(--border);border-radius:6px;padding:20px 24px;margin-top:16px}
@@ -323,8 +366,52 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 
   <div class="btn-group">
-    <button class="btn btn-primary" id="btn-search" onclick="searchAll()">🔍 Search Selected Databases</button>
+    <button class="btn btn-secondary" id="btn-build-strategy" onclick="buildStrategy()">🧠 Build Search Strategy</button>
+    <button class="btn btn-primary"   id="btn-search"         onclick="searchAll()">🔍 Search Selected Databases</button>
   </div>
+
+  <!-- Strategy card — hidden until generated -->
+  <div class="card" id="strategy-card" style="display:none;margin-top:16px;">
+    <div class="card-title">🧠 Search Strategy
+      <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="toggleStrategyLearn()">📚 Learn about search strategies</button>
+    </div>
+
+    <div class="strategy-learn" id="strategy-learn" style="display:none">
+      <h4>Boolean Operators</h4>
+      <p><code>AND</code> — narrows results; both terms must be present (e.g. <code>diabetes AND exercise</code>).<br>
+      <code>OR</code> — broadens results; either term can be present (e.g. <code>heart attack OR myocardial infarction</code>).<br>
+      <code>NOT</code> — excludes a term (use sparingly — can remove relevant records).</p>
+      <h4>MeSH Terms (Medical Subject Headings)</h4>
+      <p>PubMed indexes every article using a controlled vocabulary called MeSH. Using <code>[MeSH Terms]</code> after a term retrieves all articles tagged with that concept, even if different words are used. MeSH terms <em>explode</em> by default — meaning they also search narrower sub-terms.</p>
+      <h4>Field Tags</h4>
+      <p><code>[Title/Abstract]</code> — searches only the title and abstract fields.<br>
+      <code>[MeSH Terms]</code> — searches the controlled MeSH vocabulary.<br>
+      <code>[Author]</code> — searches by author name.</p>
+      <h4>Phrase Searching &amp; Truncation</h4>
+      <p>Wrap phrases in double quotes: <code>"heart failure"</code>.<br>
+      Use <code>*</code> for truncation: <code>therap*</code> matches therapy, therapies, therapeutic.</p>
+      <h4>Why use a structured strategy?</h4>
+      <p>A well-documented search strategy is reproducible, defensible, and required when publishing a systematic review. It ensures you retrieve all relevant literature while keeping irrelevant results manageable.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="pubmed-query-field">PubMed Query <span class="opt-tag">(MeSH terms + field tags)</span></label>
+      <textarea id="pubmed-query-field" rows="4" placeholder="Generated PubMed query will appear here…" style="font-family:monospace;font-size:13px"></textarea>
+      <p class="info">Used only for PubMed searches. Uses controlled MeSH vocabulary and field tags for maximum precision.</p>
+    </div>
+    <div class="form-group">
+      <label for="general-query-field">General Query <span class="opt-tag">(other databases)</span></label>
+      <textarea id="general-query-field" rows="3" placeholder="Generated general query will appear here…" style="font-family:monospace;font-size:13px"></textarea>
+      <p class="info">Used for Europe PMC, OpenAlex, Semantic Scholar, and ClinicalTrials.gov.</p>
+    </div>
+    <div class="strategy-explanation" id="strategy-explanation" style="display:none"></div>
+    <div id="strategy-tips" style="display:none"></div>
+
+    <div class="btn-group" style="margin-top:4px;">
+      <button class="btn btn-sm btn-danger" onclick="clearStrategy()">✕ Clear Strategy</button>
+    </div>
+  </div>
+
   <div id="search-status" style="margin-top:14px;font-size:13px;"></div>
   <div class="db-status-row" id="db-progress"></div>
 </section>
@@ -402,10 +489,47 @@ tbody tr:last-child td{border-bottom:none}
     <span class="stage-badge">Step 3 of 4</span>
   </div>
 
+  <!-- PRISMA visual flowchart -->
   <div class="card">
-    <div class="card-title">📊 PRISMA Flow Summary</div>
-    <div class="prisma-grid" id="prisma-grid"></div>
-    <div class="rsn-table" id="prisma-reasons"></div>
+    <div class="card-title">📊 PRISMA 2020 Flow Diagram</div>
+    <div id="prisma-flowchart-wrap"></div>
+    <div class="rsn-table" id="prisma-reasons" style="margin-top:16px"></div>
+  </div>
+
+  <!-- PRISMA narrative + learn -->
+  <div class="card">
+    <div class="card-title">📝 PRISMA Narrative
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-secondary" onclick="generatePrismaNarrative(false)">📋 Template Narrative</button>
+        <button class="btn btn-sm btn-primary"   onclick="generatePrismaNarrative(true)">✨ AI Formal Narrative</button>
+      </div>
+    </div>
+    <p class="info" style="margin-bottom:12px;">Generate a narrative description of your screening process. The <strong>template</strong> version fills in your numbers automatically (no tokens used). The <strong>AI formal</strong> version asks Claude Sonnet to write a publishable methods paragraph.</p>
+    <div class="narrative-out" id="prisma-narrative-out" style="display:none"></div>
+    <div style="margin-top:10px">
+      <button class="btn btn-sm btn-secondary" onclick="togglePrismaLearn()" id="btn-learn-prisma">📚 What is PRISMA? Learn more</button>
+    </div>
+    <div class="learn-prisma" id="prisma-learn-panel" style="display:none">
+      <h4>What is PRISMA?</h4>
+      <p>PRISMA (Preferred Reporting Items for Systematic Reviews and Meta-Analyses) is an evidence-based set of items for reporting in systematic reviews and meta-analyses. The 2020 update added more detail on the search and screening process. Most health and social science journals require PRISMA compliance when submitting a systematic review.</p>
+      <h4>The Four Phases</h4>
+      <ul>
+        <li><strong>Identification</strong> — Records retrieved from databases and other sources before any screening.</li>
+        <li><strong>Screening</strong> — Records assessed on title and abstract against your inclusion/exclusion criteria. Most records are removed here.</li>
+        <li><strong>Eligibility</strong> — Remaining records assessed in full text (full-text screening). This app currently supports title/abstract screening only.</li>
+        <li><strong>Included</strong> — Studies that meet all criteria and are included in the synthesis or review.</li>
+      </ul>
+      <h4>Why Report Duplicates?</h4>
+      <p>The same paper often appears in multiple databases. Recording how many duplicates were removed shows your search was comprehensive (you searched multiple sources) and your deduplication was systematic.</p>
+      <h4>How to Use This in Your Paper</h4>
+      <p>Copy the narrative above into your Methods section under "Search strategy and study selection". Include the flowchart as a figure. Report the date(s) the databases were searched, the search strings used, and who performed the screening.</p>
+      <h4>Official Resources</h4>
+      <ul>
+        <li>PRISMA 2020 statement: <a href="https://www.prisma-statement.org/" target="_blank" rel="noopener noreferrer">prisma-statement.org</a></li>
+        <li>PRISMA 2020 checklist: available at the above site as a free PDF</li>
+        <li>Reporting guideline: Page MJ et al. BMJ 2021;372:n71</li>
+      </ul>
+    </div>
   </div>
 
   <div class="card">
@@ -502,7 +626,8 @@ const state = {
   apiKey:'', ncbiKey:'', query:'', maxResults:100,
   papers:[], criteria:'', batchSize:10,
   screeningActive:false, screeningPaused:false, stopRequested:false,
-  screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1
+  screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1,
+  identifiedCount:0, dupesRemoved:0
 };
 let overridePmid = null;
 
@@ -549,12 +674,17 @@ async function searchAll(){
   if(!usePubmed&&!useEPMC&&!useOA&&!useS2&&!useCT){ showToast('Please select at least one database.','error'); return; }
   if(useOA&&!oaKey){ showToast('OpenAlex requires an API key. Register free at openalex.org/settings/api','error'); return; }
 
+  // Read strategy queries if user generated/edited them
+  const pubmedQ  = document.getElementById('pubmed-query-field')?.value.trim()  || query;
+  const generalQ = document.getElementById('general-query-field')?.value.trim() || query;
+
   state.apiKey=apiKey; state.ncbiKey=ncbiKey;
   state.query=query; state.maxResults=maxResults;
   state.papers=[];
 
   const btn=document.getElementById('btn-search');
   btn.disabled=true;
+  document.getElementById('btn-build-strategy').disabled=true;
   setStatus('search-status','<span class="spinner"></span> Searching selected databases…');
   document.getElementById('db-progress').innerHTML='';
 
@@ -565,31 +695,31 @@ async function searchAll(){
     // Run selected DBs sequentially to avoid rate-limit collisions
     if(usePubmed){
       setDbStatus('pubmed','searching');
-      const r=await fetchPubMed(query,maxResults,ncbiKey);
+      const r=await fetchPubMed(pubmedQ,maxResults,ncbiKey);
       counts.pubmed=r.length; allPapers.push(...r);
       setDbStatus('pubmed',`${r.length} found`,'done');
     }
     if(useEPMC){
       setDbStatus('europepmc','searching');
-      const r=await fetchEuropePMC(query,maxResults);
+      const r=await fetchEuropePMC(generalQ,maxResults);
       counts.europepmc=r.length; allPapers.push(...r);
       setDbStatus('europepmc',`${r.length} found`,'done');
     }
     if(useOA){
       setDbStatus('openalex','searching');
-      const r=await fetchOpenAlex(query,maxResults,oaKey);
+      const r=await fetchOpenAlex(generalQ,maxResults,oaKey);
       counts.openalex=r.length; allPapers.push(...r);
       setDbStatus('openalex',`${r.length} found`,'done');
     }
     if(useS2){
       setDbStatus('s2','searching');
-      const r=await fetchSemanticScholar(query,maxResults,s2Key);
+      const r=await fetchSemanticScholar(generalQ,maxResults,s2Key);
       counts.s2=r.length; allPapers.push(...r);
       setDbStatus('s2',`${r.length} found`,'done');
     }
     if(useCT){
       setDbStatus('ct','searching');
-      const r=await fetchClinicalTrials(query,maxResults);
+      const r=await fetchClinicalTrials(generalQ,maxResults);
       counts.ct=r.length; allPapers.push(...r);
       setDbStatus('ct',`${r.length} found`,'done');
     }
@@ -598,6 +728,9 @@ async function searchAll(){
     allPapers=deduplicatePapers(allPapers);
     const dupes=before-allPapers.length;
     state.papers=allPapers;
+    state.identifiedCount=before;
+    state.dupesRemoved=dupes;
+    state.dbCounts={...counts};
 
     // Auto-generate criteria
     setStatus('search-status','<span class="spinner"></span> Generating screening criteria…');
@@ -615,7 +748,10 @@ async function searchAll(){
   } catch(e){
     setStatus('search-status',`❌ ${esc(e.message)}`);
     showToast(e.message,'error');
-  } finally { btn.disabled=false; }
+  } finally {
+    btn.disabled=false;
+    document.getElementById('btn-build-strategy').disabled=false;
+  }
 }
 
 function dbLabel(db){ return {pubmed:'PubMed',europepmc:'Europe PMC',openalex:'OpenAlex',s2:'Semantic Scholar',ct:'ClinicalTrials.gov'}[db]||db; }
@@ -1076,26 +1212,204 @@ function computePrisma() {
 }
 
 function renderPrisma() {
-  const d=computePrisma();
-  document.getElementById('prisma-grid').innerHTML=`
-    <div class="prisma-box"><div class="prisma-num">${d.total}</div><div class="prisma-lbl">Records identified via PubMed</div></div>
-    <div class="prisma-box"><div class="prisma-num">${d.screened}</div><div class="prisma-lbl">Records screened</div></div>
-    <div class="prisma-box"><div class="prisma-num">${d.excluded}</div><div class="prisma-lbl">Records excluded</div></div>
-    <div class="prisma-box hl"><div class="prisma-num">${d.included}</div><div class="prisma-lbl">Records included</div></div>`;
+  renderPrismaFlowchart();
+  renderPrismaReasons();
+}
 
-  const el=document.getElementById('prisma-reasons');
-  const entries=Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]);
+function renderPrismaFlowchart() {
+  const d   = computePrisma();
+  const identified = state.identifiedCount || d.total;
+  const dupes      = state.dupesRemoved    || 0;
+
+  // Per-DB breakdown for identification box
+  const dbCounts = state.dbCounts || {};
+  const dbBreakdown = Object.entries(dbCounts)
+    .filter(([,n])=>n>0)
+    .map(([db,n])=>`<span class="src-badge ${dbSrcClass(db)}" style="margin:2px">${dbLabel(db)}: ${n}</span>`)
+    .join(' ');
+
+  // Top exclusion reasons (max 3) for screening box
+  const topReasons = Object.entries(d.reasons)
+    .sort((a,b)=>b[1]-a[1]).slice(0,3)
+    .map(([r])=>esc(r.slice(0,50))).join('; ');
+
+  const uncertainNote = d.uncertain > 0
+    ? `<div class="pf-sub">${d.uncertain} uncertain / pending review</div>` : '';
+
+  document.getElementById('prisma-flowchart-wrap').innerHTML = `
+  <div class="pf-wrap">
+
+    <div class="pf-phase-lbl">Identification</div>
+    <div class="pf-row">
+      <div class="pf-col-main">
+        <div class="pf-box">
+          <div class="pf-title">Records identified from databases</div>
+          <div class="pf-num">${identified}</div>
+          ${dbBreakdown ? `<div class="pf-sub" style="margin-top:8px">${dbBreakdown}</div>` : ''}
+        </div>
+      </div>
+      <div class="pf-col-side">
+        <div class="pf-h-connector"></div><div class="pf-h-arrow"></div>
+        <div class="pf-box pf-box-side" style="flex:1">
+          <div class="pf-title">Duplicates removed</div>
+          <div class="pf-num">${dupes}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pf-v-arrow"><div class="pf-v-arrow-line"></div></div>
+
+    <div class="pf-phase-lbl">Screening</div>
+    <div class="pf-row">
+      <div class="pf-col-main">
+        <div class="pf-box">
+          <div class="pf-title">Records screened (title &amp; abstract)</div>
+          <div class="pf-num">${d.screened}</div>
+          ${d.skipped ? `<div class="pf-sub">${d.skipped} skipped — no abstract</div>` : ''}
+        </div>
+      </div>
+      <div class="pf-col-side">
+        <div class="pf-h-connector"></div><div class="pf-h-arrow"></div>
+        <div class="pf-box pf-box-excl" style="flex:1">
+          <div class="pf-title">Records excluded</div>
+          <div class="pf-num">${d.excluded}</div>
+          ${topReasons ? `<div class="pf-sub">${topReasons}</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="pf-v-arrow"><div class="pf-v-arrow-line"></div></div>
+
+    <div class="pf-phase-lbl">Included</div>
+    <div class="pf-row">
+      <div class="pf-col-main">
+        <div class="pf-box pf-box-inc">
+          <div class="pf-title">Studies included</div>
+          <div class="pf-num">${d.included}</div>
+          ${uncertainNote}
+        </div>
+      </div>
+      <div class="pf-col-side"></div>
+    </div>
+
+  </div>`;
+}
+
+function renderPrismaReasons() {
+  const d = computePrisma();
+  const el = document.getElementById('prisma-reasons');
+  const entries = Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]);
+  const maxN = entries[0]?.[1] || 1;
+
   // Per-DB breakdown
-  const dbCounts={};
-  state.papers.forEach(p=>{
-    const src=p.source||'unknown';
-    src.split('+').forEach(s=>{ dbCounts[s]=(dbCounts[s]||0)+1; });
-  });
-  const dbRows=Object.entries(dbCounts).map(([db,n])=>
-    `<div class="rsn-row"><span><span class="src-badge ${dbSrcClass(db)}">${dbLabel(db)}</span></span><span class="rsn-n">${n}</span></div>`
+  const dbCounts = state.dbCounts || {};
+  const dbRows = Object.entries(dbCounts).filter(([,n])=>n>0).map(([db,n])=>
+    `<div class="rsn-row">
+       <span><span class="src-badge ${dbSrcClass(db)}">${dbLabel(db)}</span></span>
+       <span class="rsn-n">${n}</span>
+     </div>`
   ).join('');
-  const reasonRows=entries.map(([r,n])=>`<div class="rsn-row"><span>${esc(r)}</span><span class="rsn-n">${n}</span></div>`).join('');
-  el.innerHTML=(dbRows?'<h4>Records by source</h4>'+dbRows:'')+(entries.length?'<h4 style="margin-top:12px">Exclusion reasons</h4>'+reasonRows:'');
+
+  const reasonRows = entries.map(([r,n])=>`
+    <div class="rsn-row">
+      <span style="flex:1;min-width:0;word-break:break-word">${esc(r)}</span>
+      <div class="rsn-bar-wrap"><div class="rsn-bar" style="width:${Math.round(n/maxN*100)}%"></div></div>
+      <span class="rsn-n">${n}&nbsp;<span style="color:var(--muted);font-weight:400">(${d.excluded>0?Math.round(n/d.excluded*100):0}%)</span></span>
+    </div>`).join('');
+
+  el.innerHTML =
+    (dbRows  ? '<h4>Records by source</h4>' + dbRows : '') +
+    (entries.length ? '<h4 style="margin-top:14px">Exclusion reasons</h4>' + reasonRows : '');
+}
+
+// ── PRISMA Narrative ──────────────────────────────────────────────
+async function generatePrismaNarrative(useAI) {
+  const d   = computePrisma();
+  const identified = state.identifiedCount || d.total;
+  const dupes      = state.dupesRemoved    || 0;
+  const dbCounts   = state.dbCounts        || {};
+
+  const dbList = Object.entries(dbCounts).filter(([,n])=>n>0)
+    .map(([db,n])=>`${dbLabel(db)} (n=${n})`).join(', ');
+  const topReasons = Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]).slice(0,3)
+    .map(([r,n])=>`${r} (n=${n})`).join('; ');
+  const searchDate = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+  const out   = document.getElementById('prisma-narrative-out');
+  out.style.display = 'block';
+
+  if(!useAI) {
+    // Template narrative
+    let text = `A systematic search was conducted on ${searchDate} across ${Object.keys(dbCounts).filter(k=>dbCounts[k]>0).length} database${Object.keys(dbCounts).filter(k=>dbCounts[k]>0).length!==1?'s':''} (${dbList||'unspecified databases'}). A total of ${identified} record${identified!==1?'s were':' was'} identified.`;
+    if(dupes > 0) text += ` After removing ${dupes} duplicate${dupes!==1?'s':''}, ${d.total} unique record${d.total!==1?'s':''} remained.`;
+    if(d.skipped > 0) text += ` ${d.skipped} record${d.skipped!==1?'s were':' was'} excluded at the outset due to missing abstracts.`;
+    text += ` ${d.screened} record${d.screened!==1?'s were':' was'} screened on title and abstract against the pre-defined inclusion and exclusion criteria.`;
+    if(d.excluded > 0) {
+      text += ` Of these, ${d.excluded} record${d.excluded!==1?'s were':' was'} excluded during screening`;
+      if(topReasons) text += `, primarily because: ${topReasons}`;
+      text += `.`;
+    }
+    if(d.uncertain > 0) text += ` ${d.uncertain} record${d.uncertain!==1?'s were':' was'} marked as uncertain and require further review.`;
+    text += ` A total of ${d.included} study/studies met all inclusion criteria and ${d.included!==1?'were':'was'} included for synthesis.`;
+    out.textContent = text;
+    showToast('Template narrative generated.','success');
+    return;
+  }
+
+  // AI formal narrative
+  const apiKey = document.getElementById('api-key').value.trim() || state.apiKey;
+  if(!apiKey) {
+    showToast('Claude API key required for AI narrative.','error');
+    document.getElementById('api-key').focus();
+    return;
+  }
+
+  out.textContent = 'Generating formal narrative…';
+  try {
+    const prompt = `You are writing the Methods section of a systematic review.
+
+Search details:
+- Databases searched: ${dbList||'see data'}
+- Search date: ${searchDate}
+- Records identified (before deduplication): ${identified}
+- Duplicates removed: ${dupes}
+- Records screened: ${d.screened}
+- Records excluded: ${d.excluded}${topReasons ? ` (top reasons: ${topReasons})` : ''}
+- Records with missing abstracts skipped: ${d.skipped}
+- Uncertain / pending: ${d.uncertain}
+- Studies included: ${d.included}
+- Research topic: ${state.query || 'systematic review'}
+
+Write a formal, publishable PRISMA-compliant Methods paragraph describing the search and screening process. Use past tense. Be concise and precise. Do not add fabricated details. Output plain text only, no markdown, no headings.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'content-type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({ model:MODEL_SMART, max_tokens:600,
+        messages:[{role:'user',content:prompt}] })
+    });
+    if(!resp.ok) throw new Error(`Claude API error (${resp.status})`);
+    const data = await resp.json();
+    out.textContent = data.content?.[0]?.text || 'No response received.';
+    showToast('AI narrative generated.','success');
+  } catch(e){
+    out.textContent = '';
+    showToast('Narrative generation failed: ' + e.message,'error');
+  }
+}
+
+function togglePrismaLearn(){
+  const panel = document.getElementById('prisma-learn-panel');
+  const btn   = document.getElementById('btn-learn-prisma');
+  if(!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if(btn) btn.textContent = open ? '📚 What is PRISMA? Learn more' : '📚 Hide PRISMA guide';
 }
 
 function renderExportTable() {
@@ -1339,9 +1653,28 @@ function restartApp(){
   state.stopRequested = false;
   state.screenedCount = 0;
   state.maxStageReached = 1;
+  state.identifiedCount = 0;
+  state.dupesRemoved    = 0;
+  state.dbCounts        = {};
   // Reset UI elements
   const q = document.getElementById('query');
   if(q) q.value = '';
+  // Clear strategy
+  const pqf = document.getElementById('pubmed-query-field');
+  const gqf = document.getElementById('general-query-field');
+  if(pqf) pqf.value = '';
+  if(gqf) gqf.value = '';
+  const exp  = document.getElementById('strategy-explanation');
+  const tips = document.getElementById('strategy-tips');
+  if(exp)  { exp.textContent=''; exp.style.display='none'; }
+  if(tips) { tips.innerHTML='';  tips.style.display='none'; }
+  const sc = document.getElementById('strategy-card');
+  if(sc) sc.style.display = 'none';
+  // Clear PRISMA narrative
+  const narr = document.getElementById('prisma-narrative-out');
+  if(narr) { narr.textContent=''; narr.style.display='none'; }
+  const flowWrap = document.getElementById('prisma-flowchart-wrap');
+  if(flowWrap) flowWrap.innerHTML = '';
   const ct = document.getElementById('criteria-text');
   if(ct) ct.value = '';
   const sr = document.getElementById('synth-rendered');
@@ -1388,6 +1721,109 @@ function confirmBackToSearch(){
       }
     ]
   );
+}
+
+// ── Search Strategy Builder ───────────────────────────────────────
+async function buildStrategy(){
+  const query  = document.getElementById('query').value.trim();
+  const apiKey = document.getElementById('api-key').value.trim();
+
+  if(!query)  { showToast('Please enter a search query first.','error'); return; }
+  if(!apiKey) {
+    showModal(
+      '🔑 Claude API Key Required',
+      'The Search Strategy Builder uses Claude AI to generate MeSH terms and optimised queries. Please enter your Claude API key in the search settings.',
+      [{ label: 'OK', cls: 'btn-primary', action: ()=>{ document.getElementById('api-key').focus(); } }]
+    );
+    return;
+  }
+
+  const btn = document.getElementById('btn-build-strategy');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating strategy…';
+
+  try {
+    // query is user-supplied; all response fields are parsed as JSON and escaped before DOM insertion
+    const prompt = `You are an expert systematic review librarian with deep knowledge of PubMed MeSH terms and database search strategies.
+
+Given this research topic: "${query}"
+
+Return ONLY valid JSON (no markdown, no explanation outside JSON) with exactly these fields:
+{
+  "pubmedQuery": "full PubMed query using MeSH terms with [MeSH Terms] tags, synonym terms with [Title/Abstract] tags, and boolean AND/OR operators between concept blocks",
+  "generalQuery": "keyword-based query using boolean AND/OR operators, suitable for Europe PMC, OpenAlex, and other databases that do not support MeSH",
+  "explanation": "2-3 sentence plain English explanation of the strategy: which concepts were identified, which MeSH terms were selected, and why",
+  "tips": ["one practical tip about broadening or narrowing the search", "one tip about additional databases or filters to consider"]
+}`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'content-type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model: MODEL_FAST,
+        max_tokens: 1024,
+        messages:[{ role:'user', content: prompt }]
+      })
+    });
+    if(!resp.ok) throw new Error(`Claude API error (${resp.status})`);
+    const data = await resp.json();
+    const raw  = data.content?.[0]?.text || '';
+
+    // Extract JSON — handle cases where model wraps in ```json
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('Could not parse strategy response from Claude.');
+    const strat = JSON.parse(jsonMatch[0]);
+
+    // Populate fields
+    const pqf = document.getElementById('pubmed-query-field');
+    const gqf = document.getElementById('general-query-field');
+    const exp = document.getElementById('strategy-explanation');
+    const tips= document.getElementById('strategy-tips');
+
+    if(pqf) pqf.value = strat.pubmedQuery  || '';
+    if(gqf) gqf.value = strat.generalQuery || '';
+    if(exp && strat.explanation){
+      exp.textContent = strat.explanation;
+      exp.style.display = 'block';
+    }
+    if(tips && Array.isArray(strat.tips) && strat.tips.length){
+      tips.innerHTML = '<p class="info" style="margin-bottom:4px;font-weight:600">Suggestions:</p><ul class="strategy-tips">'
+        + strat.tips.map(t=>`<li>${esc(t)}</li>`).join('')
+        + '</ul>';
+      tips.style.display = 'block';
+    }
+
+    document.getElementById('strategy-card').style.display = 'block';
+    showToast('Search strategy generated. Edit the queries if needed, then click Search.', 'success');
+  } catch(e){
+    showToast('Strategy generation failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧠 Build Search Strategy';
+  }
+}
+
+function clearStrategy(){
+  document.getElementById('pubmed-query-field').value  = '';
+  document.getElementById('general-query-field').value = '';
+  const exp  = document.getElementById('strategy-explanation');
+  const tips = document.getElementById('strategy-tips');
+  if(exp)  { exp.textContent=''; exp.style.display='none'; }
+  if(tips) { tips.innerHTML='';  tips.style.display='none'; }
+  document.getElementById('strategy-card').style.display = 'none';
+  showToast('Strategy cleared. Search will use the raw query.','info');
+}
+
+function toggleStrategyLearn(){
+  const el = document.getElementById('strategy-learn');
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
 }
 
 // ── Session save / restore ────────────────────────────────────────

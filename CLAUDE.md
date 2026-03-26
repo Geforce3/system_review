@@ -160,6 +160,29 @@ This is a systematic literature review assistant that works entirely in the brow
 - Clean, professional light color scheme
 - Per-database breakdown in PRISMA flow section
 
+### Search Strategy Builder
+- **Opt-in** — user clicks "Build Search Strategy" before running the search
+- Requires Claude API key (prompts with modal if missing)
+- Calls `MODEL_FAST` (Haiku) with a single prompt asking for structured JSON containing: `pubmedQuery`, `generalQuery`, `explanation`, `tips`
+- JSON is extracted via regex (`/\{[\s\S]*\}/`) to handle model wrapping in code fences
+- `explanation` inserted via `textContent` (safe); `tips` escaped with `esc()` before `innerHTML`
+- Strategy queries stored in editable textareas (`pubmed-query-field`, `general-query-field`)
+- `searchAll()` reads these fields: `pubmedQ = pubmed-query-field.value || rawQuery`; `generalQ = general-query-field.value || rawQuery`
+- PubMed uses `pubmedQ`; all other databases use `generalQ`
+- "Clear Strategy" resets fields and hides the card; raw query is then used
+- Query is user-supplied and embedded in the Claude prompt — all response values are parsed as JSON and escaped before DOM insertion
+
+### PRISMA Transparency
+- `renderPrismaFlowchart()` builds a 3-phase visual HTML flowchart (Identification → Screening → Included) from `state.identifiedCount`, `state.dupesRemoved`, `state.dbCounts`, and `computePrisma()`
+- `renderPrismaReasons()` renders exclusion reasons with percentage bars
+- `state.identifiedCount` = total papers before deduplication (set in `searchAll()`)
+- `state.dupesRemoved` = number of duplicates removed (set in `searchAll()`)
+- `state.dbCounts` = per-database result counts `{pubmed:n, europepmc:n, ...}` (set in `searchAll()`)
+- `generatePrismaNarrative(false)` — template-based, no AI tokens, sets output via `textContent`
+- `generatePrismaNarrative(true)` — calls `MODEL_SMART` (Sonnet) for a publishable methods paragraph; output via `textContent`
+- PRISMA learn panel is a static educational section (no AI); toggled by `togglePrismaLearn()`
+- XSS: all AI-sourced strings (exclusion reasons, narrative) inserted via `textContent` or `esc()` before innerHTML
+
 ### Navigation
 - **Step indicators** (header) are clickable for any stage the user has already reached (`state.maxStageReached` tracks the highest stage visited)
 - Clicking step 1 when papers exist triggers `confirmBackToSearch()` — user chooses keep or clear

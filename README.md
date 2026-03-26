@@ -4,9 +4,11 @@ A browser-based tool for conducting systematic literature reviews across multipl
 
 ## Features
 
-- **Stage 1 — Search**: Fetch papers from PubMed, Europe PMC, OpenAlex, and Semantic Scholar — choose any combination
+- **Stage 1 — Search**: Fetch papers from PubMed, Europe PMC, OpenAlex, Semantic Scholar, and ClinicalTrials.gov — choose any combination
+- **Search Strategy Builder**: Before searching, click "Build Search Strategy" to have Claude generate an optimised PubMed query (with MeSH terms and field tags) and a general keyword query for other databases. Edit either query before running the search. Includes a "Learn about search strategies" panel covering boolean operators, MeSH terms, field tags, and truncation.
 - **Stage 2 — AI Screening**: Claude auto-screens papers against editable inclusion/exclusion criteria; pause/stop/manual override supported
-- **Stage 3 — Export**: PRISMA flow summary with per-database breakdown; download results as CSV or RIS
+- **Stage 3 — Export**: PRISMA 2020 visual flowchart (Identification → Screening → Included) with per-database breakdown; exclusion reason analysis with percentage bars; download results as CSV or RIS
+- **PRISMA Narrative**: Generate a template narrative (no AI tokens) or an AI-written formal PRISMA methods paragraph (Claude Sonnet) ready to copy into your paper. Includes a "Learn about PRISMA" guide.
 - **Stage 4 — Synthesis**: Generate a structured narrative synthesis and evidence table from included papers
 - **Deduplication**: Papers appearing in multiple databases are automatically merged
 - **Session save/restore**: Export and reimport your screening session as JSON (API keys excluded)
