@@ -69,8 +69,8 @@ Since February 2026, OpenAlex requires a free registered key:
 ### NCBI API Key (optional — PubMed only)
 Increases PubMed rate limit from 3 to 10 requests/second. Register at [ncbi.nlm.nih.gov/account](https://www.ncbi.nlm.nih.gov/account/).
 
-### Semantic Scholar API Key (optional)
-No key needed for basic use. A key increases rate limits. Register at [semanticscholar.org](https://www.semanticscholar.org/product/api). Semantic Scholar is only available via the server deployment.
+### Semantic Scholar API Key (optional — recommended for Railway deployments)
+No key needed for basic use. However, the unauthenticated tier allows only ~1 request/second from a single IP. Because all users share the Railway server's IP, the rate limit is hit quickly under concurrent use — resulting in a 429 error. The server retries automatically (up to 3×), but a free API key raises the limit significantly. Register at [semanticscholar.org](https://www.semanticscholar.org/product/api). Semantic Scholar is only available via the server deployment.
 
 ---
 

@@ -713,9 +713,13 @@ async function searchAll(){
     }
     if(useS2){
       setDbStatus('s2','searching');
-      const r=await fetchSemanticScholar(generalQ,maxResults,s2Key);
-      counts.s2=r.length; allPapers.push(...r);
-      setDbStatus('s2',`${r.length} found`,'done');
+      try{
+        const r=await fetchSemanticScholar(generalQ,maxResults,s2Key);
+        counts.s2=r.length; allPapers.push(...r);
+        setDbStatus('s2',`${r.length} found`,'done');
+      }catch(e){
+        setDbStatus('s2',e.message,'error');
+      }
     }
     if(useCT){
       setDbStatus('ct','searching');
@@ -850,10 +854,13 @@ function reconstructOAAbstract(inv){
 // ── Semantic Scholar fetch (via server proxy) ────────────────────
 async function fetchSemanticScholar(query,maxResults,apiKey){
   const limit=Math.min(maxResults,100);
-  let url=`/api/semantic-scholar?query=${encodeURIComponent(query)}&limit=${limit}`;
-  if(apiKey) url+=`&apiKey=${encodeURIComponent(apiKey)}`;
-  const r=await fetch(url);
+  const url=`/api/semantic-scholar?query=${encodeURIComponent(query)}&limit=${limit}`;
+  // Send API key as a header, not a query param, to avoid server log exposure
+  const headers={};
+  if(apiKey) headers['x-s2-api-key']=apiKey;
+  const r=await fetch(url,{headers});
   if(r.status===503) throw new Error('Semantic Scholar proxy not available (are you running via npm start or Railway?)');
+  if(r.status===429) throw new Error('Semantic Scholar is rate-limited. Wait a moment and retry, or add a Semantic Scholar API key for higher limits.');
   if(!r.ok) throw new Error(`Semantic Scholar failed (${r.status})`);
   const data=await r.json();
   const results=data.data||[];

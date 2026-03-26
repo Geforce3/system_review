@@ -26,10 +26,27 @@ app.use(basicAuth({
 // ── Semantic Scholar proxy ────────────────────────────────────────
 // Semantic Scholar blocks direct browser calls (CORS). This route
 // forwards the request server-side and returns the JSON response.
-app.get('/api/semantic-scholar', (req, res) => {
+// API key is read from the x-s2-api-key request header (not a query
+// param) so it is never written to server access logs.
+
+function s2Request(options) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, body }));
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.end();
+  });
+}
+
+app.get('/api/semantic-scholar', async (req, res) => {
   const query  = req.query.query;
   const limit  = Math.min(parseInt(req.query.limit) || 100, 100);
-  const apiKey = req.query.apiKey || process.env.SEMANTIC_SCHOLAR_KEY || '';
+  // API key comes from a request header, not a query param, to avoid log exposure
+  const apiKey = req.headers['x-s2-api-key'] || process.env.SEMANTIC_SCHOLAR_KEY || '';
 
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: 'query parameter required' });
@@ -47,28 +64,34 @@ app.get('/api/semantic-scholar', (req, res) => {
     }
   };
 
-  const proxyReq = https.request(options, (proxyRes) => {
-    // Only allow JSON success responses through
-    if (proxyRes.statusCode !== 200) {
-      res.status(proxyRes.statusCode).json({ error: `Semantic Scholar returned ${proxyRes.statusCode}` });
-      proxyRes.resume();
-      return;
+  // Retry up to 3 times with exponential backoff on 429 (rate limit)
+  const retryDelays = [1000, 2000, 4000];
+  let result;
+  for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+    try {
+      result = await s2Request(options);
+    } catch (err) {
+      if (err.message === 'timeout') {
+        return res.status(504).json({ error: 'Semantic Scholar request timed out' });
+      }
+      console.error('S2 proxy error:', err.message);
+      return res.status(502).json({ error: 'Semantic Scholar proxy error' });
     }
-    res.setHeader('Content-Type', 'application/json');
-    proxyRes.pipe(res);
-  });
 
-  proxyReq.on('error', (err) => {
-    console.error('S2 proxy error:', err.message);
-    res.status(502).json({ error: 'Semantic Scholar proxy error' });
-  });
+    if (result.statusCode === 429 && attempt < retryDelays.length) {
+      const retryAfterMs = (parseInt(result.headers['retry-after']) || retryDelays[attempt] / 1000) * 1000;
+      await new Promise(r => setTimeout(r, retryAfterMs));
+      continue;
+    }
+    break;
+  }
 
-  proxyReq.setTimeout(15000, () => {
-    proxyReq.destroy();
-    res.status(504).json({ error: 'Semantic Scholar request timed out' });
-  });
+  if (result.statusCode !== 200) {
+    return res.status(result.statusCode).json({ error: `Semantic Scholar returned ${result.statusCode}` });
+  }
 
-  proxyReq.end();
+  res.setHeader('Content-Type', 'application/json');
+  res.send(result.body);
 });
 
 // ── Serve only index.html — no other files exposed ───────────────

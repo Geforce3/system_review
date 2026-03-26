@@ -71,10 +71,15 @@ This is a systematic literature review assistant that works entirely in the brow
 ### Semantic Scholar
 - **CORS-blocked for direct browser calls** — requires server-side proxy
 - Cannot be used when app is opened as a local file (`file://` protocol)
-- Server proxy route: `GET /api/semantic-scholar?query=<q>&limit=<n>&apiKey=<k>`
+- Server proxy route: `GET /api/semantic-scholar?query=<q>&limit=<n>`
+- API key passed as `x-s2-api-key` request header (NOT a query param — avoids server log exposure)
 - Proxy forwards to: `https://api.semanticscholar.org/graph/v1/paper/search`
 - Fields requested: `title,authors,year,abstract,externalIds,journal,publicationVenue`
 - No key required for basic use; optional S2 API key increases rate limits
+- **Rate limiting**: unauthenticated tier ~1 req/s from a single IP; all Railway users share one IP
+- **Retry logic**: proxy retries up to 3 times with exponential backoff (1 s → 2 s → 4 s) on 429; respects `Retry-After` header if present
+- After all retries exhausted, 429 is returned to the client with a user-friendly message
+- S2 fetch is wrapped in a per-DB try/catch — a 429 failure does not abort other databases
 - SSRF prevention: hostname hardcoded in server.js, never taken from client input
 - Timeout: 15 seconds
 
@@ -99,7 +104,7 @@ This is a systematic literature review assistant that works entirely in the brow
 - No user data is ever stored server-side; all processing is client-side in the browser
 - DOI links validated against `/^10\.\d{4,}\/\S+$/` before constructing `https://doi.org/` URLs (open redirect prevention)
 - Error messages escaped with `esc()` before DOM insertion (XSS prevention)
-- Semantic Scholar proxy: limit clamped server-side to max 100, API keys not logged
+- Semantic Scholar proxy: limit clamped server-side to max 100; API key sent as `x-s2-api-key` request header (not query param) so it never appears in server access logs
 
 ### Deduplication
 - Papers from multiple databases are deduplicated in two passes:
