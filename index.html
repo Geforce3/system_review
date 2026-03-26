@@ -636,7 +636,7 @@ function buildRow(p,i) {
     <td class="col-n">${i+1}</td>
     <td class="col-title">
       <div class="title-cell">
-        ${p.doi?`<a href="https://doi.org/${p.doi}" target="_blank">${esc(p.title)}</a>`:esc(p.title)}
+        ${(p.doi&&/^10\.\d{4,}\/\S+$/.test(p.doi))?`<a href="https://doi.org/${p.doi}" target="_blank">${esc(p.title)}</a>`:esc(p.title)}
         <span class="abs-toggle" onclick="toggleAbs('${esc(p.pmid)}')">▶ Show abstract</span>
       </div>
       <div class="abs-preview" id="abs-${p.pmid}">${esc(absShort)}</div>

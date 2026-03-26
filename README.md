@@ -1,4 +1,4 @@
-# NUS Libraries — Systematic Review Assistant
+# PubMed — Systematic Review Assistant
 
 A browser-based tool for conducting systematic literature reviews using PubMed. Helps researchers search, screen, export, and synthesise academic papers with AI-assisted decision support.
 
