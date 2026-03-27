@@ -777,7 +777,7 @@ async function searchAll(){
     // Run selected DBs sequentially to avoid rate-limit collisions
     if(usePubmed){
       setDbStatus('pubmed','searching');
-      const r=await fetchPubMed(pubmedQ,maxResults,ncbiKey);
+      const r=await fetchPubMed(pubmedQ,maxResults,state.ncbiKey);
       counts.pubmed=r.length; allPapers.push(...r);
       setDbStatus('pubmed',`${r.length} found`,'done');
     }
