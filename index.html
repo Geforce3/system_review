@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'self' https://eutils.ncbi.nlm.nih.gov https://api.anthropic.com https://www.ebi.ac.uk https://api.openalex.org https://clinicaltrials.gov; object-src 'none'; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'self' https://eutils.ncbi.nlm.nih.gov https://api.anthropic.com https://www.ebi.ac.uk https://api.openalex.org https://clinicaltrials.gov https://api.openai.com https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none';">
 <title>Systematic Review Assistant</title>
 <style>
 :root {
@@ -362,6 +362,37 @@ tbody tr:last-child td{border-bottom:none}
         <label for="s2-key">Semantic Scholar Key <span class="opt-tag">(optional — higher rate limit)</span></label>
         <input type="text" id="s2-key" placeholder="Optional — semanticscholar.org/product/api">
       </div>
+      <div class="form-group">
+        <label for="openai-key">OpenAI API Key <span class="opt-tag">(required for GPT models)</span></label>
+        <input type="password" id="openai-key" placeholder="sk-…">
+        <p class="info">Register at <strong>platform.openai.com</strong>. Required only if you select a GPT model below.</p>
+      </div>
+      <div class="form-group">
+        <label for="gemini-key">Google AI API Key <span class="opt-tag">(required for Gemini models)</span></label>
+        <input type="password" id="gemini-key" placeholder="AIza…">
+        <p class="info">Get a free key at <strong>aistudio.google.com</strong>. Required only if you select a Gemini model below.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🤖 AI Model Settings</div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-weight:400">
+        <input type="checkbox" id="model-mode-toggle" onchange="onModelModeChange()" style="width:16px;height:16px;accent-color:var(--navy);flex-shrink:0">
+        <span style="font-weight:600">Per-task model selection</span>
+      </label>
+      <p class="info" id="model-mode-hint" style="margin-top:4px">Single model used for all AI tasks.</p>
+    </div>
+    <div class="form-row">
+      <div class="form-group" id="screening-model-group" style="display:none">
+        <label for="screening-model">Screening model <span class="opt-tag">(criteria + per-paper screening)</span></label>
+        <select id="screening-model" onchange="state.screeningModel=this.value"></select>
+      </div>
+      <div class="form-group">
+        <label for="analysis-model" id="analysis-model-label">AI model <span class="opt-tag">(all tasks)</span></label>
+        <select id="analysis-model" onchange="onAnalysisModelChange()"></select>
+      </div>
     </div>
   </div>
 
@@ -502,10 +533,12 @@ tbody tr:last-child td{border-bottom:none}
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-secondary" onclick="generatePrismaNarrative(false)">📋 Template Narrative</button>
         <button class="btn btn-sm btn-primary"   onclick="generatePrismaNarrative(true)">✨ AI Formal Narrative</button>
+        <button class="btn btn-sm btn-warning" id="btn-check-prisma" onclick="checkPrismaFlow()">🔍 Check PRISMA Flow</button>
       </div>
     </div>
-    <p class="info" style="margin-bottom:12px;">Generate a narrative description of your screening process. The <strong>template</strong> version fills in your numbers automatically (no tokens used). The <strong>AI formal</strong> version asks Claude Sonnet to write a publishable methods paragraph.</p>
+    <p class="info" style="margin-bottom:12px;">Generate a narrative description of your screening process. The <strong>template</strong> version fills in your numbers automatically (no tokens used). The <strong>AI formal</strong> version writes a publishable methods paragraph. <strong>Check PRISMA Flow</strong> uses AI to verify mathematical consistency and methodology soundness.</p>
     <div class="narrative-out" id="prisma-narrative-out" style="display:none"></div>
+    <div class="narrative-out" id="prisma-check-out" style="display:none;margin-top:12px;border-color:var(--orange);background:#FFF7ED"></div>
     <div style="margin-top:10px">
       <button class="btn btn-sm btn-secondary" onclick="togglePrismaLearn()" id="btn-learn-prisma">📚 What is PRISMA? Learn more</button>
     </div>
@@ -530,6 +563,23 @@ tbody tr:last-child td{border-bottom:none}
         <li>Reporting guideline: Page MJ et al. BMJ 2021;372:n71</li>
       </ul>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔍 Verify Screening Decisions</div>
+    <p class="info" style="margin-bottom:12px;">Run a second AI pass on all screened papers using your <strong>analysis model</strong>. Papers where the verification decision differs from the original are flagged in a disagreement report — you can then accept or reject the suggested changes.</p>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="btn-verify" onclick="verifyDecisions()">🔍 Verify All Decisions</button>
+      <button class="btn btn-danger"  id="btn-verify-stop" onclick="stopVerification()" disabled>⏹ Stop</button>
+    </div>
+    <div class="progress-wrap" id="verify-progress-wrap" style="display:none;margin-top:12px">
+      <div class="progress-labels">
+        <span id="verify-prog-txt">Verifying…</span>
+        <span id="verify-prog-pct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="verify-prog-fill"></div></div>
+    </div>
+    <div id="verify-out" style="display:none;margin-top:14px"></div>
   </div>
 
   <div class="card">
@@ -625,16 +675,30 @@ tbody tr:last-child td{border-bottom:none}
 
 <script>
 // ── Models ──────────────────────────────────────────────────────
-const MODEL_FAST  = 'claude-haiku-4-5-20251001'; // criteria + screening
-const MODEL_SMART = 'claude-sonnet-4-6';          // synthesis
+const MODEL_FAST  = 'claude-haiku-4-5-20251001'; // default screening
+const MODEL_SMART = 'claude-sonnet-4-6';          // default analysis
+
+const MODELS = [
+  {id:'claude-haiku-4-5-20251001',     label:'Claude Haiku 4.5',  provider:'claude'},
+  {id:'claude-sonnet-4-6',             label:'Claude Sonnet 4.6', provider:'claude'},
+  {id:'claude-opus-4-6',              label:'Claude Opus 4.6',   provider:'claude'},
+  {id:'gpt-4o',                        label:'GPT-4o',            provider:'openai'},
+  {id:'gpt-4o-mini',                   label:'GPT-4o Mini',       provider:'openai'},
+  {id:'gemini-2.5-pro-preview-05-06',  label:'Gemini 2.5 Pro',   provider:'gemini'},
+  {id:'gemini-2.0-flash',              label:'Gemini 2.0 Flash',  provider:'gemini'},
+];
+function getProvider(modelId){ return (MODELS.find(m=>m.id===modelId)||{provider:'claude'}).provider; }
 
 // ── State ───────────────────────────────────────────────────────
 const state = {
-  apiKey:'', ncbiKey:'', query:'', maxResults:100,
+  apiKey:'', ncbiKey:'', openaiKey:'', geminiKey:'',
+  query:'', maxResults:100,
   papers:[], criteria:'', batchSize:10,
   screeningActive:false, screeningPaused:false, stopRequested:false,
   screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1,
-  identifiedCount:0, dupesRemoved:0
+  identifiedCount:0, dupesRemoved:0, dbCounts:{},
+  modelMode:'single', screeningModel:MODEL_FAST, analysisModel:MODEL_SMART,
+  verifyStopRequested:false
 };
 let overridePmid = null;
 
@@ -665,8 +729,6 @@ function toggleAllDbs(on){
 async function searchAll(){
   const query     = document.getElementById('query').value.trim();
   const maxResults= parseInt(document.getElementById('max-results').value)||100;
-  const apiKey    = document.getElementById('api-key').value.trim();
-  const ncbiKey   = document.getElementById('ncbi-key').value.trim();
   const oaKey     = document.getElementById('openalex-key').value.trim();
   const s2Key     = document.getElementById('s2-key').value.trim();
 
@@ -676,16 +738,29 @@ async function searchAll(){
   const useS2      = document.getElementById('db-s2')?.checked && !isLocalFile();
   const useCT      = document.getElementById('db-ct')?.checked;
 
-  if(!query)  { showToast('Please enter a search query.','error'); return; }
-  if(!apiKey) { showToast('Please enter your Claude API key.','error'); return; }
+  if(!query){ showToast('Please enter a search query.','error'); return; }
   if(!usePubmed&&!useEPMC&&!useOA&&!useS2&&!useCT){ showToast('Please select at least one database.','error'); return; }
   if(useOA&&!oaKey){ showToast('OpenAlex requires an API key. Register free at openalex.org/settings/api','error'); return; }
+
+  // Read all keys and model selections from UI into state
+  readModelsFromUI();
+
+  // Validate AI keys for selected models
+  const sProvider=getProvider(state.screeningModel), aProvider=getProvider(state.analysisModel);
+  if((sProvider==='claude'||aProvider==='claude') && !state.apiKey){
+    showToast('Claude API key required for selected AI models.','error'); return;
+  }
+  if((sProvider==='openai'||aProvider==='openai') && !state.openaiKey){
+    showToast('OpenAI API key required for selected AI models.','error'); return;
+  }
+  if((sProvider==='gemini'||aProvider==='gemini') && !state.geminiKey){
+    showToast('Google AI API key required for selected AI models.','error'); return;
+  }
 
   // Read strategy queries if user generated/edited them
   const pubmedQ  = document.getElementById('pubmed-query-field')?.value.trim()  || query;
   const generalQ = document.getElementById('general-query-field')?.value.trim() || query;
 
-  state.apiKey=apiKey; state.ncbiKey=ncbiKey;
   state.query=query; state.maxResults=maxResults;
   state.papers=[];
 
@@ -997,8 +1072,8 @@ function parseXML(xml) {
 function finalDecision(p){ return p.manualDecision||p.aiDecision; }
 
 // ── Claude API ───────────────────────────────────────────────────
-async function callClaude(messages, system, model) {
-  const body={model,max_tokens:1024,system,messages};
+async function callClaude(messages, system, model, maxTokens=1024) {
+  const body={model,max_tokens:maxTokens,system,messages};
   const opts={
     method:'POST',
     headers:{
@@ -1023,6 +1098,62 @@ async function callClaude(messages, system, model) {
   return (await res.json()).content?.[0]?.text||'';
 }
 
+// ── OpenAI API ───────────────────────────────────────────────────
+async function callOpenAI(messages, system, model, maxTokens=1024) {
+  if(!state.openaiKey) throw new Error('OpenAI API key required. Enter it in the Database API Keys section.');
+  const msgs = system ? [{role:'system',content:system},...messages] : [...messages];
+  const body = {model, max_tokens:maxTokens, messages:msgs};
+  const res = await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+state.openaiKey,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(res.status===401) throw new Error('Invalid OpenAI API key. Check your key at platform.openai.com.');
+  if(res.status===429) throw new Error('OpenAI rate limited. Try again shortly or reduce batch size.');
+  if(!res.ok){
+    const d=await res.json().catch(()=>({}));
+    throw new Error(`OpenAI API ${res.status}: ${d.error?.message||res.statusText}`);
+  }
+  return (await res.json()).choices?.[0]?.message?.content||'';
+}
+
+// ── Gemini API ────────────────────────────────────────────────────
+// Note: API key sent via x-goog-api-key header (not URL param) to keep it out of browser history.
+async function callGemini(messages, system, model, maxTokens=1024) {
+  if(!state.geminiKey) throw new Error('Google AI API key required. Enter it in the Database API Keys section.');
+  const contents = messages.map(m=>({
+    role: m.role==='assistant'?'model':'user',
+    parts:[{text:m.content}]
+  }));
+  const body = {
+    contents,
+    generationConfig:{maxOutputTokens:maxTokens}
+  };
+  if(system) body.systemInstruction = {parts:[{text:system}]};
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const res = await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-goog-api-key':state.geminiKey},
+    body:JSON.stringify(body)
+  });
+  if(res.status===400||res.status===401) throw new Error('Invalid Google AI API key. Check your key at aistudio.google.com.');
+  if(res.status===429) throw new Error('Gemini rate limited. Try again shortly.');
+  if(!res.ok){
+    const d=await res.json().catch(()=>({}));
+    throw new Error(`Gemini API ${res.status}: ${d.error?.message||res.statusText}`);
+  }
+  const data=await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+// ── Universal AI call (routes by provider) ────────────────────────
+async function callAI(messages, system, model, maxTokens=1024) {
+  const provider=getProvider(model);
+  if(provider==='openai') return callOpenAI(messages,system,model,maxTokens);
+  if(provider==='gemini') return callGemini(messages,system,model,maxTokens);
+  return callClaude(messages,system,model,maxTokens);
+}
+
 async function generateCriteria(query) {
   const sys=`You are a systematic review methodologist. Generate clear inclusion and exclusion criteria for a systematic literature review based on the PubMed search query provided.
 
@@ -1036,7 +1167,7 @@ EXCLUSION CRITERIA:
 2. ...
 
 Aim for 3-5 specific, actionable criteria per category suitable for screening titles and abstracts.`;
-  return callClaude([{role:'user',content:`PubMed query: ${query}\n\nGenerate appropriate screening criteria.`}],sys,MODEL_FAST);
+  return callAI([{role:'user',content:`PubMed query: ${query}\n\nGenerate appropriate screening criteria.`}],sys,state.screeningModel);
 }
 
 // ── Screening loop ───────────────────────────────────────────────
@@ -1095,9 +1226,9 @@ Reply ONLY with valid JSON (no markdown):
 or {"decision":"exclude","reason":"one sentence"}
 or {"decision":"uncertain","reason":"one sentence"}`;
   try {
-    const txt=await callClaude(
+    const txt=await callAI(
       [{role:'user',content:`Title: ${paper.title}\n\nAbstract: ${paper.abstract}`}],
-      sys, MODEL_FAST
+      sys, state.screeningModel
     );
     const m=txt.match(/\{[\s\S]*\}/);
     if(!m) throw new Error('No JSON in response');
@@ -1371,13 +1502,7 @@ async function generatePrismaNarrative(useAI) {
   }
 
   // AI formal narrative
-  const apiKey = document.getElementById('api-key').value.trim() || state.apiKey;
-  if(!apiKey) {
-    showToast('Claude API key required for AI narrative.','error');
-    document.getElementById('api-key').focus();
-    return;
-  }
-
+  readModelsFromUI();
   out.textContent = 'Generating formal narrative…';
   try {
     const prompt = `You are writing the Methods section of a systematic review.
@@ -1396,20 +1521,8 @@ Search details:
 
 Write a formal, publishable PRISMA-compliant Methods paragraph describing the search and screening process. Use past tense. Be concise and precise. Do not add fabricated details. Output plain text only, no markdown, no headings.`;
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'content-type':'application/json',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body:JSON.stringify({ model:MODEL_SMART, max_tokens:600,
-        messages:[{role:'user',content:prompt}] })
-    });
-    if(!resp.ok) throw new Error(`Claude API error (${resp.status})`);
-    const data = await resp.json();
-    out.textContent = data.content?.[0]?.text || 'No response received.';
+    const txt = await callAI([{role:'user',content:prompt}],'',state.analysisModel,600);
+    out.textContent = txt || 'No response received.';
     showToast('AI narrative generated.','success');
   } catch(e){
     out.textContent = '';
@@ -1493,7 +1606,8 @@ async function synthesisePapers() {
 
   const btn=document.getElementById('btn-synth');
   btn.disabled=true;
-  setStatus('synth-status','<span class="spinner"></span> Generating synthesis with Claude Sonnet… this may take a minute.');
+  const modelLabel=MODELS.find(m=>m.id===state.analysisModel)?.label||state.analysisModel;
+  setStatus('synth-status',`<span class="spinner"></span> Generating synthesis with ${esc(modelLabel)}… this may take a minute.`);
 
   try {
     const paperList=included.map((p,i)=>
@@ -1512,10 +1626,10 @@ A markdown table with columns: | Study (Author Year) | Population/Setting | Inte
 
 Be analytical — identify convergences and divergences across studies.`;
 
-    const txt=await callClaude([{
+    const txt=await callAI([{
       role:'user',
       content:`Query: ${state.query}\n\nIncluded papers (${included.length}):\n\n${paperList}`
-    }],sys,MODEL_SMART);
+    }],sys,state.analysisModel,2048);
 
     state.rawSynthesis=txt;
     setStatus('synth-status','✅ Synthesis complete.');
@@ -1693,8 +1807,9 @@ function goToStage(n) {
   if(n===3){ renderPrisma(); renderExportTable(); }
   if(n===4){
     const inc=state.papers.filter(p=>finalDecision(p)==='include').length;
+    const synthModelLabel=MODELS.find(m=>m.id===state.analysisModel)?.label||state.analysisModel;
     document.getElementById('synth-intro').textContent=
-      `${inc} paper${inc!==1?'s':''} marked as included will be synthesised using Claude Sonnet (most capable model).`;
+      `${inc} paper${inc!==1?'s':''} marked as included will be synthesised using ${synthModelLabel}.`;
   }
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1766,9 +1881,10 @@ function restartApp(){
   state.stopRequested = false;
   state.screenedCount = 0;
   state.maxStageReached = 1;
-  state.identifiedCount = 0;
-  state.dupesRemoved    = 0;
-  state.dbCounts        = {};
+  state.identifiedCount       = 0;
+  state.dupesRemoved          = 0;
+  state.dbCounts              = {};
+  state.verifyStopRequested   = false;
   // Reset UI elements
   const q = document.getElementById('query');
   if(q) q.value = '';
@@ -1783,9 +1899,16 @@ function restartApp(){
   if(tips) { tips.innerHTML='';  tips.style.display='none'; }
   const sc = document.getElementById('strategy-card');
   if(sc) sc.style.display = 'none';
-  // Clear PRISMA narrative
+  // Clear PRISMA narrative and check
   const narr = document.getElementById('prisma-narrative-out');
   if(narr) { narr.textContent=''; narr.style.display='none'; }
+  const prismaCheck = document.getElementById('prisma-check-out');
+  if(prismaCheck) { prismaCheck.textContent=''; prismaCheck.style.display='none'; }
+  // Clear verification output
+  const verifyOut = document.getElementById('verify-out');
+  if(verifyOut) { verifyOut.innerHTML=''; verifyOut.style.display='none'; }
+  const verifyWrap = document.getElementById('verify-progress-wrap');
+  if(verifyWrap) verifyWrap.style.display='none';
   const flowWrap = document.getElementById('prisma-flowchart-wrap');
   if(flowWrap) flowWrap.innerHTML = '';
   const ct = document.getElementById('criteria-text');
@@ -1838,18 +1961,11 @@ function confirmBackToSearch(){
 
 // ── Search Strategy Builder ───────────────────────────────────────
 async function buildStrategy(){
-  const query  = document.getElementById('query').value.trim();
-  const apiKey = document.getElementById('api-key').value.trim();
+  const query = document.getElementById('query').value.trim();
+  if(!query) { showToast('Please enter a search query first.','error'); return; }
 
-  if(!query)  { showToast('Please enter a search query first.','error'); return; }
-  if(!apiKey) {
-    showModal(
-      '🔑 Claude API Key Required',
-      'The Search Strategy Builder uses Claude AI to generate MeSH terms and optimised queries. Please enter your Claude API key in the search settings.',
-      [{ label: 'OK', cls: 'btn-primary', action: ()=>{ document.getElementById('api-key').focus(); } }]
-    );
-    return;
-  }
+  // Read keys and model selections into state before calling AI
+  readModelsFromUI();
 
   const btn = document.getElementById('btn-build-strategy');
   btn.disabled = true;
@@ -1869,27 +1985,11 @@ Return ONLY valid JSON (no markdown, no explanation outside JSON) with exactly t
   "tips": ["one practical tip about broadening or narrowing the search", "one tip about additional databases or filters to consider"]
 }`;
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'content-type':'application/json',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body: JSON.stringify({
-        model: MODEL_FAST,
-        max_tokens: 1024,
-        messages:[{ role:'user', content: prompt }]
-      })
-    });
-    if(!resp.ok) throw new Error(`Claude API error (${resp.status})`);
-    const data = await resp.json();
-    const raw  = data.content?.[0]?.text || '';
+    const raw = await callAI([{role:'user',content:prompt}],'',state.screeningModel);
 
     // Extract JSON — handle cases where model wraps in ```json
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('Could not parse strategy response from Claude.');
+    if(!jsonMatch) throw new Error('Could not parse strategy response from AI model.');
     const strat = JSON.parse(jsonMatch[0]);
 
     // Populate fields
@@ -1949,10 +2049,11 @@ function saveSession() {
     criteria:state.criteria,
     papers:state.papers.map(p=>({
       pmid:p.pmid,title:p.title,authors:p.authors,year:p.year,
-      journal:p.journal,doi:p.doi,abstract:p.abstract,
-      aiDecision:p.aiDecision,aiReason:p.aiReason,manualDecision:p.manualDecision
+      journal:p.journal,doi:p.doi,abstract:p.abstract,source:p.source||'',
+      aiDecision:p.aiDecision,aiReason:p.aiReason,manualDecision:p.manualDecision,
+      verifyDecision:p.verifyDecision||'',verifyReason:p.verifyReason||''
     }))
-    // API keys intentionally excluded
+    // API keys and model selections intentionally excluded
   };
   const date=new Date().toISOString().slice(0,10);
   dlFile(JSON.stringify(session,null,2),`slr_session_${date}.json`,'application/json');
@@ -1970,7 +2071,12 @@ function loadSession(input) {
       state.query=s.query||'';
       state.maxResults=s.maxResults||100;
       state.criteria=s.criteria||'';
-      state.papers=s.papers.map(p=>({...p,manualDecision:p.manualDecision||''}));
+      state.papers=s.papers.map(p=>({
+        ...p,
+        manualDecision:p.manualDecision||'',
+        verifyDecision:p.verifyDecision||'',
+        verifyReason:p.verifyReason||''
+      }));
       if(state.query) document.getElementById('query').value=state.query;
       if(state.criteria) document.getElementById('criteria-text').value=state.criteria;
       renderPapersTable();
@@ -1996,8 +2102,251 @@ function showToast(msg,type='info') {
   _toastTimer=setTimeout(()=>t.classList.remove('show'),4000);
 }
 
+// ── Model selection helpers ───────────────────────────────────────
+function readModelsFromUI(){
+  state.apiKey    = document.getElementById('api-key').value.trim();
+  state.ncbiKey   = document.getElementById('ncbi-key').value.trim();
+  state.openaiKey = (document.getElementById('openai-key')?.value||'').trim();
+  state.geminiKey = (document.getElementById('gemini-key')?.value||'').trim();
+  const pertask   = state.modelMode === 'pertask';
+  state.analysisModel  = document.getElementById('analysis-model')?.value || MODEL_SMART;
+  state.screeningModel = pertask
+    ? (document.getElementById('screening-model')?.value || MODEL_FAST)
+    : state.analysisModel;
+}
+
+function populateModelDropdowns(){
+  const opts = MODELS.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
+  const sm = document.getElementById('screening-model');
+  const am = document.getElementById('analysis-model');
+  if(sm){ sm.innerHTML=opts; sm.value=state.screeningModel; }
+  if(am){ am.innerHTML=opts; am.value=state.analysisModel; }
+}
+
+function onModelModeChange(){
+  const pertask = document.getElementById('model-mode-toggle').checked;
+  state.modelMode = pertask ? 'pertask' : 'single';
+  const sg  = document.getElementById('screening-model-group');
+  const lbl = document.getElementById('analysis-model-label');
+  const hint= document.getElementById('model-mode-hint');
+  if(pertask){
+    if(sg)  sg.style.display='block';
+    if(lbl) lbl.innerHTML='Analysis model <span class="opt-tag">(synthesis, PRISMA, verification)</span>';
+    if(hint) hint.textContent='Screening and analysis tasks use separate models.';
+  } else {
+    if(sg)  sg.style.display='none';
+    if(lbl) lbl.innerHTML='AI model <span class="opt-tag">(all tasks)</span>';
+    if(hint) hint.textContent='Single model used for all AI tasks.';
+    // Mirror analysis model to screening when in single mode
+    state.screeningModel = state.analysisModel;
+  }
+}
+
+function onAnalysisModelChange(){
+  state.analysisModel = document.getElementById('analysis-model')?.value || MODEL_SMART;
+  if(state.modelMode === 'single') state.screeningModel = state.analysisModel;
+}
+
+// ── PRISMA Flow Check ─────────────────────────────────────────────
+async function checkPrismaFlow(){
+  readModelsFromUI();
+  const d = computePrisma();
+  const identified = state.identifiedCount || d.total;
+  const dupes      = state.dupesRemoved    || 0;
+  const dbCounts   = state.dbCounts        || {};
+  const dbList = Object.entries(dbCounts).filter(([,n])=>n>0).map(([db,n])=>`${dbLabel(db)} (n=${n})`).join(', ');
+  const topReasons = Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([r,n])=>`"${r}" (n=${n})`).join(', ');
+  const dupRate = identified>0 ? Math.round(dupes/identified*100) : 0;
+  const exclRate= d.screened>0 ? Math.round(d.excluded/d.screened*100) : 0;
+
+  const out = document.getElementById('prisma-check-out');
+  out.style.display='block';
+  out.textContent='Checking PRISMA flow…';
+  const btn = document.getElementById('btn-check-prisma');
+  btn.disabled=true;
+
+  try {
+    const prompt=`You are an expert systematic review methodologist. Review this PRISMA flow data and provide a structured assessment.
+
+## PRISMA Flow Data
+- Databases searched: ${dbList||'unspecified'}
+- Records identified (before deduplication): ${identified}
+- Duplicates removed: ${dupes} (${dupRate}% deduplication rate)
+- Records after deduplication: ${d.total}
+- Records screened: ${d.screened}
+- Records excluded: ${d.excluded} (${exclRate}% exclusion rate)
+- Records skipped (no abstract): ${d.skipped}
+- Uncertain / pending manual review: ${d.uncertain}
+- Studies included: ${d.included}
+- Top exclusion reasons: ${topReasons||'none recorded'}
+- Research criteria: ${state.criteria||'not specified'}
+
+## Mathematical Check
+- Expected: ${identified} - ${dupes} = ${d.total} (deduped) ✓ or ✗?
+- Expected: ${d.screened} + ${d.skipped} = ${d.total} (screened+skipped=deduped) ✓ or ✗?
+- Expected: ${d.excluded} + ${d.included} + ${d.uncertain} = ${d.screened} (outcomes=screened) ✓ or ✗?
+
+## Your Task
+Provide a structured review with these 7 sections. Use ✅ correct, ⚠️ concern, or ❌ issue:
+
+1. MATHEMATICAL CONSISTENCY — Are all numbers internally consistent?
+2. SEARCH COVERAGE — Is the database selection adequate for a systematic review?
+3. DEDUPLICATION RATE — Is the ${dupRate}% deduplication rate typical and plausible?
+4. SCREENING OUTCOMES — Are the inclusion/exclusion rates reasonable? Flag extreme values.
+5. EXCLUSION REASONS — Are the recorded reasons specific enough for PRISMA reporting?
+6. CRITERIA QUALITY — Are the inclusion/exclusion criteria specific and appropriate for abstract screening?
+7. OVERALL ASSESSMENT — One sentence summary with a concrete recommendation.
+
+Be specific and constructive. Output plain text only, no markdown headers.`;
+
+    const txt = await callAI([{role:'user',content:prompt}],'',state.analysisModel,1500);
+    out.textContent = txt||'No response received.';
+    showToast('PRISMA flow check complete.','success');
+  } catch(e){
+    out.textContent='';
+    showToast('PRISMA check failed: '+e.message,'error');
+  } finally { btn.disabled=false; }
+}
+
+// ── Decision Verification ─────────────────────────────────────────
+async function verifyDecisions(){
+  readModelsFromUI();
+  const papers = state.papers.filter(p=>p.aiDecision&&p.aiDecision!=='skipped');
+  if(!papers.length){ showToast('No screened papers to verify.','error'); return; }
+  if(!state.criteria){ showToast('Criteria not found. Please ensure papers were screened with criteria.','error'); return; }
+
+  const btn   = document.getElementById('btn-verify');
+  const wrap  = document.getElementById('verify-progress-wrap');
+  const stopBtn = document.getElementById('btn-verify-stop');
+  btn.disabled=true;
+  if(stopBtn) stopBtn.disabled=false;
+  wrap.style.display='block';
+  state.verifyStopRequested=false;
+
+  const sys=`You are a systematic review screener. Apply the criteria to decide if the paper should be included.
+
+Criteria:
+${state.criteria}
+
+Reply ONLY with valid JSON (no markdown):
+{"decision":"include","reason":"one sentence"}
+or {"decision":"exclude","reason":"one sentence"}
+or {"decision":"uncertain","reason":"one sentence"}`;
+
+  let done=0;
+  const total=papers.length;
+
+  for(const paper of papers){
+    if(state.verifyStopRequested) break;
+    try {
+      const txt=await callAI(
+        [{role:'user',content:`Title: ${paper.title}\n\nAbstract: ${paper.abstract}`}],
+        sys, state.analysisModel
+      );
+      const m=txt.match(/\{[\s\S]*\}/);
+      if(m){
+        const obj=JSON.parse(m[0]);
+        paper.verifyDecision=['include','exclude','uncertain'].includes(obj.decision)?obj.decision:'uncertain';
+        paper.verifyReason=obj.reason||'';
+      }
+    } catch(e){
+      paper.verifyDecision='uncertain';
+      paper.verifyReason='Verification error';
+      console.error('verifyOne error',paper.pmid,e);
+    }
+    done++;
+    const pct=Math.round(done/total*100);
+    const fill=document.getElementById('verify-prog-fill');
+    const pctEl=document.getElementById('verify-prog-pct');
+    const txtEl=document.getElementById('verify-prog-txt');
+    if(fill) fill.style.width=pct+'%';
+    if(pctEl) pctEl.textContent=pct+'%';
+    if(txtEl) txtEl.textContent=`Verified ${done} of ${total} papers`;
+    await sleep(500);
+  }
+
+  state.verifyStopRequested=false;
+  btn.disabled=false;
+  if(stopBtn) stopBtn.disabled=true;
+  wrap.style.display='none';
+  renderVerifyReport();
+}
+
+function stopVerification(){ state.verifyStopRequested=true; }
+
+function renderVerifyReport(){
+  const disagreements=state.papers.filter(p=>
+    p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
+    p.verifyDecision !== (p.manualDecision||p.aiDecision)
+  );
+  const out=document.getElementById('verify-out');
+  out.style.display='block';
+
+  if(!disagreements.length){
+    out.innerHTML='<p style="color:var(--muted);font-size:13px">✅ All verification decisions match current decisions — no disagreements found.</p>';
+    showToast('Verification complete — all decisions agree.','success');
+    return;
+  }
+
+  const labels={include:'✅ Include',exclude:'❌ Exclude',uncertain:'❓ Uncertain'};
+  const cls={include:'badge-include',exclude:'badge-exclude',uncertain:'badge-uncertain'};
+
+  const rows=disagreements.map(p=>`
+    <tr>
+      <td class="col-title"><div class="title-cell">${esc(trunc(p.title,80))}</div></td>
+      <td><span class="badge ${cls[p.manualDecision||p.aiDecision]||''}">${labels[p.manualDecision||p.aiDecision]||(p.manualDecision||p.aiDecision)}</span></td>
+      <td><span class="badge ${cls[p.verifyDecision]||''}">${labels[p.verifyDecision]||p.verifyDecision}</span></td>
+      <td class="col-rsn">${esc(p.verifyReason)}</td>
+      <td><button class="btn btn-sm btn-secondary" onclick="acceptVerify('${esc(p.pmid)}')">Accept</button></td>
+    </tr>`).join('');
+
+  out.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <p style="font-size:13px;color:var(--muted)">${disagreements.length} paper${disagreements.length!==1?'s':''} where verification differs from the current decision.</p>
+      <button class="btn btn-sm btn-warning" onclick="acceptAllVerify()">Accept All Verifications</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="col-title">Title</th>
+          <th>Current Decision</th>
+          <th>Verification Decision</th>
+          <th class="col-rsn">Reason</th>
+          <th>Action</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  showToast(`Verification found ${disagreements.length} disagreement${disagreements.length!==1?'s':''}.`,'info');
+}
+
+function acceptVerify(pmid){
+  const p=state.papers.find(x=>x.pmid===pmid);
+  if(p&&p.verifyDecision){
+    p.manualDecision=p.verifyDecision;
+    updateBadgeRow(p);
+    renderVerifyReport();
+    renderExportTable();
+    showToast('Decision updated.','success');
+  }
+}
+
+function acceptAllVerify(){
+  const disagreements=state.papers.filter(p=>
+    p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
+    p.verifyDecision !== (p.manualDecision||p.aiDecision)
+  );
+  disagreements.forEach(p=>{ p.manualDecision=p.verifyDecision; updateBadgeRow(p); });
+  renderVerifyReport();
+  renderExportTable();
+  renderPrisma();
+  showToast(`${disagreements.length} decision${disagreements.length!==1?'s':''} updated.`,'success');
+}
+
 // ── Init ─────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', initDbSelector);
+document.addEventListener('DOMContentLoaded', ()=>{ initDbSelector(); populateModelDropdowns(); });
 
 // ── Utilities ────────────────────────────────────────────────────
 function setStatus(id,html){ const el=document.getElementById(id); if(el) el.innerHTML=html; }

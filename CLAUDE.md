@@ -6,10 +6,18 @@ This is a systematic literature review assistant that works entirely in the brow
 ## Critical Rules
 
 ### API Configuration
-- **Model tiering** — select the most capable model appropriate for each task to conserve tokens:
-  - `claude-haiku-4-5-20251001` — criteria generation and per-paper screening (fast, cheap, repeated calls)
-  - `claude-sonnet-4-6` — evidence synthesis only (complex reasoning, quality matters)
-  - Update model IDs when newer versions are released; always prefer the latest available
+- **Multi-provider model support** — users can select any of these models in the UI:
+  - Claude: `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-6`
+  - OpenAI: `gpt-4o`, `gpt-4o-mini`
+  - Gemini: `gemini-2.5-pro-preview-05-06`, `gemini-2.0-flash`
+- **Default model tiering** (when user hasn't changed selections):
+  - Screening model default: `claude-haiku-4-5-20251001` — criteria generation and per-paper screening
+  - Analysis model default: `claude-sonnet-4-6` — synthesis, PRISMA narrative, verification
+- **Model selection modes** (toggle in Stage 1):
+  - Single mode: one model for all tasks
+  - Per-task mode: separate screening model and analysis model
+- All model selections stored in `state.screeningModel` and `state.analysisModel`
+- `readModelsFromUI()` reads all keys and model selections from the DOM into state — call this at the start of any AI function that may run without going through `searchAll()`
 - Claude API calls must include headers:
   ```
   x-api-key: <userApiKey>
@@ -17,16 +25,21 @@ This is a systematic literature review assistant that works entirely in the brow
   content-type: application/json
   anthropic-dangerous-direct-browser-access: true
   ```
+- OpenAI API endpoint: `https://api.openai.com/v1/chat/completions` — auth via `Authorization: Bearer <key>` header
+- Gemini API endpoint: `https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent` — auth via `x-goog-api-key` header (NOT query param, to keep key out of browser history)
+- Universal wrapper: `callAI(messages, system, model, maxTokens=1024)` routes to correct provider based on `getProvider(modelId)`
 
 ### Error Handling
 - PubMed API errors: Show user-friendly message, allow retry
-- Claude API errors: Display error, continue with remaining papers, allow manual override
+- AI API errors: Display error, continue with remaining papers, allow manual override
 - XML parsing errors: Handle missing fields gracefully (e.g., "No abstract available")
-- Rate limiting: Always add 500ms delay between Claude API calls
+- Rate limiting: Always add 500ms delay between AI API calls
 
 ### Data Handling
-- API key stored in memory only — NEVER persist to localStorage, sessionStorage, or cookies
+- All API keys stored in memory only — NEVER persist to localStorage, sessionStorage, or cookies
+- This applies to: Claude key, OpenAI key, Gemini key, NCBI key, OpenAlex key
 - Paper data persists in JavaScript memory during session
+- `verifyDecision` and `verifyReason` fields on papers persist in session exports (keys excluded)
 - App logic is entirely client-side; `server.js` is a thin static file server + Semantic Scholar proxy only
 
 ## Databases
@@ -104,7 +117,10 @@ This is a systematic literature review assistant that works entirely in the brow
 - No user data is ever stored server-side; all processing is client-side in the browser
 - DOI links validated against `/^10\.\d{4,}\/\S+$/` before constructing `https://doi.org/` URLs (open redirect prevention)
 - Error messages escaped with `esc()` before DOM insertion (XSS prevention)
+- All AI response text (PRISMA check, verification, narrative) inserted via `textContent` or `esc()` — never raw `innerHTML`
 - Semantic Scholar proxy: limit clamped server-side to max 100; API key sent as `x-s2-api-key` request header (not query param) so it never appears in server access logs
+- Gemini API key sent as `x-goog-api-key` header (not URL query param) for same reason
+- CSP `connect-src` includes `https://api.openai.com` and `https://generativelanguage.googleapis.com`
 
 ### Deduplication
 - Papers from multiple databases are deduplicated in two passes:
@@ -160,10 +176,28 @@ This is a systematic literature review assistant that works entirely in the brow
 - Plain text export strips markdown syntax (headings, bold/italic, table pipes) via regex before download
 - Filename slug is derived from `state.query` (max 40 chars, alphanumeric + hyphens) — never from AI output
 
-### Claude API Format
-- Direct browser fetch to: `https://api.anthropic.com/v1/messages`
-- Messages format with system prompt and user content
-- Parse JSON response from Claude
+### AI API Routing
+- `callAI(messages, system, model, maxTokens=1024)` — universal wrapper, routes by provider
+- `callClaude(messages, system, model, maxTokens)` — Claude provider
+- `callOpenAI(messages, system, model, maxTokens)` — OpenAI provider
+- `callGemini(messages, system, model, maxTokens)` — Gemini provider
+- `getProvider(modelId)` — returns `'claude'`, `'openai'`, or `'gemini'` from the `MODELS` registry
+- For synthesis use `maxTokens=2048`; for PRISMA narrative use `maxTokens=600`; for PRISMA check use `maxTokens=1500`; default elsewhere is `1024`
+
+### PRISMA Flow Check (new)
+- `checkPrismaFlow()` — AI reviews the PRISMA statistics for mathematical consistency and methodology soundness
+- Uses `state.analysisModel`; output via `textContent` into `#prisma-check-out` (never raw `innerHTML`)
+- Checks: number arithmetic, database coverage, deduplication rate, exclusion rates, reason specificity, criteria quality
+- Button: "🔍 Check PRISMA Flow" in the PRISMA Narrative card header
+
+### Decision Verification (new)
+- `verifyDecisions()` — second AI pass re-screens all papers using `state.analysisModel`
+- Stores results in `paper.verifyDecision` and `paper.verifyReason` (neither replaces `aiDecision`)
+- `renderVerifyReport()` — shows disagreement table (papers where `verifyDecision !== current decision`)
+- `acceptVerify(pmid)` — sets `paper.manualDecision = paper.verifyDecision` for one paper
+- `acceptAllVerify()` — accepts all verification suggestions at once; re-renders PRISMA and export table
+- Output in `#verify-out`; progress bar in `#verify-progress-wrap`
+- XSS: all table cells use `esc()`, reason text uses `esc()`
 
 ### UI Requirements
 - 4 clear stages with step indicator at top
@@ -177,8 +211,8 @@ This is a systematic literature review assistant that works entirely in the brow
 
 ### Search Strategy Builder
 - **Opt-in** — user clicks "Build Search Strategy" before running the search
-- Requires Claude API key (prompts with modal if missing)
-- Calls `MODEL_FAST` (Haiku) with a single prompt asking for structured JSON containing: `pubmedQuery`, `generalQuery`, `explanation`, `tips`
+- Calls `readModelsFromUI()` first, then uses `callAI(..., state.screeningModel)` — works with any provider
+- Calls the screening model with a single prompt asking for structured JSON containing: `pubmedQuery`, `generalQuery`, `explanation`, `tips`
 - JSON is extracted via regex (`/\{[\s\S]*\}/`) to handle model wrapping in code fences
 - `explanation` inserted via `textContent` (safe); `tips` escaped with `esc()` before `innerHTML`
 - Strategy queries stored in editable textareas (`pubmed-query-field`, `general-query-field`)
@@ -192,11 +226,12 @@ This is a systematic literature review assistant that works entirely in the brow
 - `renderPrismaReasons()` renders exclusion reasons with percentage bars
 - `state.identifiedCount` = total papers before deduplication (set in `searchAll()`)
 - `state.dupesRemoved` = number of duplicates removed (set in `searchAll()`)
-- `state.dbCounts` = per-database result counts `{pubmed:n, europepmc:n, ...}` (set in `searchAll()`)
+- `state.dbCounts` = per-database result counts `{pubmed:n, europepmc:n, ...}` (initialized in state, set in `searchAll()`)
 - `generatePrismaNarrative(false)` — template-based, no AI tokens, sets output via `textContent`
-- `generatePrismaNarrative(true)` — calls `MODEL_SMART` (Sonnet) for a publishable methods paragraph; output via `textContent`
+- `generatePrismaNarrative(true)` — calls `callAI(..., state.analysisModel, 600)` for a publishable methods paragraph; output via `textContent`
+- `checkPrismaFlow()` — AI methodology review; output via `textContent` into `#prisma-check-out`
 - PRISMA learn panel is a static educational section (no AI); toggled by `togglePrismaLearn()`
-- XSS: all AI-sourced strings (exclusion reasons, narrative) inserted via `textContent` or `esc()` before innerHTML
+- XSS: all AI-sourced strings (exclusion reasons, narrative, check output) inserted via `textContent` or `esc()` before innerHTML
 
 ### Navigation
 - **Step indicators** (header) are clickable for any stage the user has already reached (`state.maxStageReached` tracks the highest stage visited)

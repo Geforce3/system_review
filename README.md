@@ -5,10 +5,13 @@ A browser-based tool for conducting systematic literature reviews across multipl
 ## Features
 
 - **Stage 1 — Search**: Fetch papers from PubMed, Europe PMC, OpenAlex, Semantic Scholar, and ClinicalTrials.gov — choose any combination
-- **Search Strategy Builder**: Before searching, click "Build Search Strategy" to have Claude generate an optimised PubMed query (with MeSH terms and field tags) and a general keyword query for other databases. Edit either query before running the search. Includes a "Learn about search strategies" panel covering boolean operators, MeSH terms, field tags, and truncation.
-- **Stage 2 — AI Screening**: Claude auto-screens papers against editable inclusion/exclusion criteria; pause/stop/manual override supported
+- **Multi-provider AI models**: Choose from Claude (Haiku, Sonnet, Opus), OpenAI (GPT-4o, GPT-4o Mini), or Gemini (2.5 Pro, 2.0 Flash). Select a single model for all tasks, or separate models for screening vs. analysis.
+- **Search Strategy Builder**: Before searching, click "Build Search Strategy" to have the AI generate an optimised PubMed query (with MeSH terms and field tags) and a general keyword query for other databases. Edit either query before running the search. Includes a "Learn about search strategies" panel covering boolean operators, MeSH terms, field tags, and truncation.
+- **Stage 2 — AI Screening**: AI auto-screens papers against editable inclusion/exclusion criteria; pause/stop/manual override supported
 - **Stage 3 — Export**: PRISMA 2020 visual flowchart (Identification → Screening → Included) with per-database breakdown; exclusion reason analysis with percentage bars; download results as CSV or RIS
-- **PRISMA Narrative**: Generate a template narrative (no AI tokens) or an AI-written formal PRISMA methods paragraph (Claude Sonnet) ready to copy into your paper. Includes a "Learn about PRISMA" guide.
+- **PRISMA Narrative**: Generate a template narrative (no AI tokens) or an AI-written formal PRISMA methods paragraph ready to copy into your paper. Includes a "Learn about PRISMA" guide.
+- **PRISMA Flow Check**: AI reviews your PRISMA statistics for mathematical consistency and methodology soundness — flags issues with numbers, database coverage, exclusion rates, and criteria quality.
+- **Decision Verification**: Run a second AI pass on all screened papers using your chosen analysis model. View a disagreement report showing where the two passes differ, and selectively or bulk-accept the verification suggestions.
 - **Stage 4 — Synthesis**: Generate a structured narrative synthesis and evidence table from included papers; download as Markdown, Plain text, HTML, Word (.doc), or PDF
 - **Deduplication**: Papers appearing in multiple databases are automatically merged
 - **Session save/restore**: Export and reimport your screening session as JSON (API keys excluded)
@@ -57,8 +60,14 @@ Then in the app:
 
 ## API Keys
 
-### Claude API Key (required for AI features)
+### Claude API Key (required for Claude models)
 Register at [console.anthropic.com](https://console.anthropic.com). Enter your key in the app — it is stored in browser memory only and never sent to the server.
+
+### OpenAI API Key (required for GPT models)
+Register at [platform.openai.com](https://platform.openai.com). Enter your key in the **Database API Keys** section. Only needed if you select a GPT model.
+
+### Google AI API Key (required for Gemini models)
+Get a free key at [aistudio.google.com](https://aistudio.google.com). Enter your key in the **Database API Keys** section. Only needed if you select a Gemini model.
 
 ### OpenAlex API Key (required for OpenAlex searches)
 Since February 2026, OpenAlex requires a free registered key:
@@ -134,7 +143,9 @@ Every push to the `main` branch on GitHub triggers an automatic redeploy on Rail
 | Local (open file) | Any modern browser (Chrome, Firefox, Safari, Edge) |
 | Local (server) | Node.js ≥ 18, npm |
 | Railway deployment | Railway account, GitHub repo |
-| AI features | Claude API key from [console.anthropic.com](https://console.anthropic.com) |
+| Claude AI features | Claude API key from [console.anthropic.com](https://console.anthropic.com) |
+| GPT AI features | OpenAI API key from [platform.openai.com](https://platform.openai.com) |
+| Gemini AI features | Google AI API key from [aistudio.google.com](https://aistudio.google.com) |
 | OpenAlex searches | Free OpenAlex key from [openalex.org](https://openalex.org/getting-started) |
 | Semantic Scholar | Server deployment (local file not supported) |
 
@@ -147,11 +158,12 @@ Every push to the `main` branch on GitHub triggers an automatic redeploy on Rail
 - **Europe PMC integration**: EBI REST API (free, no key required)
 - **OpenAlex integration**: OpenAlex API (free key required since Feb 2026)
 - **Semantic Scholar integration**: Server-side proxy via Express.js (CORS bypass)
-- **AI integration**: Claude API — direct browser-to-Anthropic calls
-  - `claude-haiku-4-5-20251001` — criteria generation and paper screening
-  - `claude-sonnet-4-6` — evidence synthesis
+- **AI integration**: Multi-provider — direct browser calls to each provider's API
+  - Claude: `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-6`
+  - OpenAI: `gpt-4o`, `gpt-4o-mini`
+  - Gemini: `gemini-2.5-pro-preview-05-06`, `gemini-2.0-flash`
 - **Server**: Minimal Express.js + HTTP Basic Auth (Railway only; not needed for local use)
-- **Privacy**: Claude API key stored in browser memory only; never sent to the server or persisted anywhere
+- **Privacy**: All API keys stored in browser memory only; never sent to the server or persisted anywhere
 - **Deduplication**: Papers matched by DOI, then by normalized title across databases
 
 ---
