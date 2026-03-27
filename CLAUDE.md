@@ -155,7 +155,20 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 
 ### Common Bugs to Avoid
 
-1. **XML Parsing Failures**
+1. **Stale async state on re-run**
+   - When an async process (verification, screening) can be stopped and restarted, always clear the previous run's results at the *start* of the new run — not at the end of the old one.
+   - Pattern: `state.papers.forEach(p => { p.verifyDecision=''; p.verifyReason=''; });` at the top of `verifyDecisions()` before the loop.
+   - Failing to do this leaves partial results from a stopped run mixed with new results.
+
+2. **Navigation during async process wipes in-progress state**
+   - `goToStage(3)` clears verification output on entry. Without a guard, navigating away and back while verification is running silently discards progress.
+   - Use an `state.verifyActive` flag: set `true` on start, `false` on finish. Guard the clear block: if `state.verifyActive`, show toast and return early.
+
+3. **Removed local variable still referenced at call site**
+   - When refactoring a function to use `state.*` fields (removing local `const x = ...`), every call site that passes `x` as an argument must be updated simultaneously. Missing a call site passes `undefined` silently — no error until the feature is exercised.
+   - Pattern that caused the ncbiKey bug: `fetchPubMed(q, n, ncbiKey)` after `ncbiKey` local was deleted → now `state.ncbiKey`.
+
+4. **XML Parsing Failures**
    - PubMed XML may have empty `<AbstractText>` tags
    - Authors may be missing or formatted inconsistently
    - Always use defensive checks: `element?.textContent || "N/A"`
@@ -221,6 +234,8 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - `acceptVerify(pmid)` — sets `paper.manualDecision = paper.verifyDecision` for one paper
 - `acceptAllVerify()` — accepts all verification suggestions at once; re-renders PRISMA and export table
 - Output in `#verify-out`; progress bar in `#verify-progress-wrap`
+- `state.verifyActive` — set `true` on start of `verifyDecisions()`, `false` on finish; `goToStage(3)` checks this flag and blocks navigation with a toast if verification is still running
+- At the start of each `verifyDecisions()` run, all `verifyDecision`/`verifyReason` fields are cleared first to prevent stale partial results from a previous stopped run
 - XSS: all table cells use `esc()`, reason text uses `esc()`
 
 ### UI Requirements

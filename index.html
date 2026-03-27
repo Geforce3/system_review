@@ -1805,6 +1805,10 @@ function goToStage(n) {
   }
   state.currentStage=n;
   if(n===3){
+    if(state.verifyActive){
+      showToast('Verification is still running — please wait or stop it first.','error');
+      return;
+    }
     // Clear session-specific outputs so stale results don't persist on re-entry
     const vc=document.getElementById('verify-out');
     if(vc){ vc.innerHTML=''; vc.style.display='none'; }
@@ -2237,6 +2241,9 @@ async function verifyDecisions(){
   if(stopBtn) stopBtn.disabled=false;
   wrap.style.display='block';
   state.verifyStopRequested=false;
+  state.verifyActive=true;
+  // Clear any stale results from a previous (possibly partial) run
+  state.papers.forEach(p => { p.verifyDecision=''; p.verifyReason=''; });
 
   const sys=`You are a systematic review screener. Apply the criteria to decide if the paper should be included.
 
@@ -2281,6 +2288,7 @@ or {"decision":"uncertain","reason":"one sentence"}`;
   }
 
   state.verifyStopRequested=false;
+  state.verifyActive=false;
   btn.disabled=false;
   if(stopBtn) stopBtn.disabled=true;
   wrap.style.display='none';
