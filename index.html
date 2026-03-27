@@ -1804,7 +1804,16 @@ function goToStage(n) {
     if(i <= (state.maxStageReached||1) && i !== n) s.classList.add('clickable');
   }
   state.currentStage=n;
-  if(n===3){ renderPrisma(); renderExportTable(); }
+  if(n===3){
+    // Clear session-specific outputs so stale results don't persist on re-entry
+    const vc=document.getElementById('verify-out');
+    if(vc){ vc.innerHTML=''; vc.style.display='none'; }
+    const pc=document.getElementById('prisma-check-out');
+    if(pc){ pc.textContent=''; pc.style.display='none'; }
+    const vw=document.getElementById('verify-progress-wrap');
+    if(vw) vw.style.display='none';
+    renderPrisma(); renderExportTable();
+  }
   if(n===4){
     const inc=state.papers.filter(p=>finalDecision(p)==='include').length;
     const synthModelLabel=MODELS.find(m=>m.id===state.analysisModel)?.label||state.analysisModel;
@@ -1929,6 +1938,11 @@ function restartApp(){
   if(btnScreen) btnScreen.disabled = false;
   if(btnPause)  btnPause.disabled  = true;
   if(btnStop)   btnStop.disabled   = true;
+  // Reset verification buttons
+  const btnVerify     = document.getElementById('btn-verify');
+  const btnVerifyStop = document.getElementById('btn-verify-stop');
+  if(btnVerify)     btnVerify.disabled     = false;
+  if(btnVerifyStop) btnVerifyStop.disabled = true;
   updatePapersCount();
   goToStage(1);
   showToast('All cleared. Ready for a new search.', 'success');
@@ -2278,7 +2292,7 @@ function stopVerification(){ state.verifyStopRequested=true; }
 function renderVerifyReport(){
   const disagreements=state.papers.filter(p=>
     p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
-    p.verifyDecision !== (p.manualDecision||p.aiDecision)
+    p.verifyDecision !== finalDecision(p)
   );
   const out=document.getElementById('verify-out');
   out.style.display='block';
@@ -2336,7 +2350,7 @@ function acceptVerify(pmid){
 function acceptAllVerify(){
   const disagreements=state.papers.filter(p=>
     p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
-    p.verifyDecision !== (p.manualDecision||p.aiDecision)
+    p.verifyDecision !== finalDecision(p)
   );
   disagreements.forEach(p=>{ p.manualDecision=p.verifyDecision; updateBadgeRow(p); });
   renderVerifyReport();

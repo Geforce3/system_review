@@ -129,6 +129,30 @@ This is a systematic literature review assistant that works entirely in the brow
 - First database to return a paper wins; subsequent duplicates are discarded
 - Source badges show original database(s) on each paper row
 
+### Security Patterns
+
+These patterns must be followed to maintain XSS safety. Violations are subtle and hard to spot in review.
+
+**`esc()` only escapes `&`, `<`, `>`, `"`  — it does NOT escape single quotes `'`**
+- Safe for `innerHTML` contexts (all four characters needed for HTML injection are escaped)
+- Safe for HTML attribute values delimited by double quotes: `attribute="${esc(val)}"`
+- **Not safe** in single-quoted attribute contexts: `attribute='${esc(val)}'` — do not use this pattern
+- Existing code uses `onclick="fn('${esc(p.pmid)}')"` — this is safe **only because** all database IDs (PubMed numeric, NCT########, OpenAlex URL-style, Europe PMC IDs) never contain single quotes. Do not extend this pattern to fields that could contain arbitrary user text.
+
+**`setStatus(id, html)` uses `innerHTML` — treat it like innerHTML**
+- Never pass AI-sourced strings directly: use `esc()` around any dynamic value
+- Static spinner/emoji strings are fine
+- Pattern to follow: `setStatus('x', `❌ ${esc(e.message)}`)` ✅ | `setStatus('x', aiText)` ❌
+
+**`showModal(title, body, buttons)` — `body` is inserted via `innerHTML`**
+- Only use static HTML strings or numeric values (e.g., `state.papers.length`) in body
+- Never pass AI response text, user-typed input, or `p.title`/`p.aiReason` as modal body
+- For user-visible text that comes from data, use `textContent` on a child element instead
+
+**New AI outputs (PRISMA check, verification, narrative)**
+- Always insert via `textContent` (not `innerHTML`) — e.g., `out.textContent = txt`
+- Disagreement table cells: use `esc()` before embedding in template literals
+
 ### Common Bugs to Avoid
 
 1. **XML Parsing Failures**
