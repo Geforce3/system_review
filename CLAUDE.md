@@ -231,6 +231,7 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 ### Decision Verification (new)
 - `verifyDecisions()` — second AI pass re-screens all papers using `state.analysisModel`
 - Stores results in `paper.verifyDecision` and `paper.verifyReason` (neither replaces `aiDecision`)
+- `getDisagreements()` — shared helper returning papers where `verifyDecision !== finalDecision(p)`; used by `renderVerifyReport()` and `acceptAllVerify()` — do not inline this filter again
 - `renderVerifyReport()` — shows disagreement table (papers where `verifyDecision !== current decision`)
 - `acceptVerify(pmid)` — sets `paper.manualDecision = paper.verifyDecision` for one paper
 - `acceptAllVerify()` — accepts all verification suggestions at once; re-renders PRISMA and export table
@@ -240,6 +241,7 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - XSS: all table cells use `esc()`, reason text uses `esc()`
 
 ### UI Requirements
+- `BADGE_LABELS` and `BADGE_CLASSES` — module-level constants (near top of `<script>`) mapping decision keys (`include`, `exclude`, `uncertain`, `skipped`) to display strings and CSS class names; used by `badgeHtml()`, `renderExportTable()`, and `renderVerifyReport()` — do not re-declare inline
 - 4 clear stages with step indicator at top
 - Database selector in Stage 1 with per-DB status indicators
 - Progress bar and counter during screening
@@ -264,6 +266,7 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 ### PRISMA Transparency
 - `renderPrismaFlowchart()` builds a 3-phase visual HTML flowchart (Identification → Screening → Included) from `state.identifiedCount`, `state.dupesRemoved`, `state.dbCounts`, and `computePrisma()`
 - `renderPrismaReasons()` renders exclusion reasons with percentage bars
+- `assemblePrismaData()` — shared helper that returns `{d, identified, dupes, dbCounts}` from state; called by `renderPrismaFlowchart()`, `generatePrismaNarrative()`, and `checkPrismaFlow()` — do not inline these four lines again
 - `state.identifiedCount` = total papers before deduplication (set in `searchAll()`)
 - `state.dupesRemoved` = number of duplicates removed (set in `searchAll()`)
 - `state.dbCounts` = per-database result counts `{pubmed:n, europepmc:n, ...}` (initialized in state, set in `searchAll()`)

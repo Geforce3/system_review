@@ -698,6 +698,9 @@ tbody tr:last-child td{border-bottom:none}
 const MODEL_FAST  = 'claude-haiku-4-5-20251001'; // default screening
 const MODEL_SMART = 'claude-sonnet-4-6';          // default analysis
 
+const BADGE_LABELS = {include:'✅ Include',exclude:'❌ Exclude',uncertain:'❓ Uncertain',skipped:'⊘ No Abstract'};
+const BADGE_CLASSES = {include:'badge-include',exclude:'badge-exclude',uncertain:'badge-uncertain',skipped:'badge-skipped'};
+
 const MODELS = [
   {id:'claude-haiku-4-5-20251001',     label:'Claude Haiku 4.5',  provider:'claude'},
   {id:'claude-sonnet-4-6',             label:'Claude Sonnet 4.6', provider:'claude'},
@@ -1300,12 +1303,10 @@ function buildRow(p,i) {
 function badgeHtml(p) {
   const fd=finalDecision(p);
   if(!fd) return `<span class="badge badge-pending" onclick="openOverride(event,'${esc(p.pmid)}')">— Pending</span>`;
-  const labels={include:'✅ Include',exclude:'❌ Exclude',uncertain:'❓ Uncertain',skipped:'⊘ No Abstract'};
-  const cls={include:'badge-include',exclude:'badge-exclude',uncertain:'badge-uncertain',skipped:'badge-skipped'};
   const man=p.manualDecision?' badge-manual':'';
   const star=p.manualDecision?' <sup title="Manually overridden">★</sup>':'';
   const click=fd!=='skipped'?`onclick="openOverride(event,'${esc(p.pmid)}')"`:'' ;
-  return `<span class="badge ${cls[fd]||''}${man}" ${click}>${labels[fd]||fd}${star}</span>`;
+  return `<span class="badge ${BADGE_CLASSES[fd]||''}${man}" ${click}>${BADGE_LABELS[fd]||fd}${star}</span>`;
 }
 
 function updateBadgeRow(p) {
@@ -1376,18 +1377,23 @@ function computePrisma() {
   return {total,skipped,screened,included,excluded,uncertain,reasons};
 }
 
+function assemblePrismaData() {
+  const d = computePrisma();
+  return {
+    d,
+    identified : state.identifiedCount || d.total,
+    dupes      : state.dupesRemoved    || 0,
+    dbCounts   : state.dbCounts        || {}
+  };
+}
+
 function renderPrisma() {
   renderPrismaFlowchart();
   renderPrismaReasons();
 }
 
 function renderPrismaFlowchart() {
-  const d   = computePrisma();
-  const identified = state.identifiedCount || d.total;
-  const dupes      = state.dupesRemoved    || 0;
-
-  // Per-DB breakdown for identification box
-  const dbCounts = state.dbCounts || {};
+  const {d, identified, dupes, dbCounts} = assemblePrismaData();
   const dbBreakdown = Object.entries(dbCounts)
     .filter(([,n])=>n>0)
     .map(([db,n])=>`<span class="src-badge ${dbSrcClass(db)}" style="margin:2px">${dbLabel(db)}: ${n}</span>`)
@@ -1489,10 +1495,7 @@ function renderPrismaReasons() {
 
 // ── PRISMA Narrative ──────────────────────────────────────────────
 async function generatePrismaNarrative(useAI) {
-  const d   = computePrisma();
-  const identified = state.identifiedCount || d.total;
-  const dupes      = state.dupesRemoved    || 0;
-  const dbCounts   = state.dbCounts        || {};
+  const {d, identified, dupes, dbCounts} = assemblePrismaData();
 
   const dbList = Object.entries(dbCounts).filter(([,n])=>n>0)
     .map(([db,n])=>`${dbLabel(db)} (n=${n})`).join(', ');
@@ -1562,7 +1565,6 @@ function togglePrismaLearn(){
 function renderExportTable() {
   const tbody=document.getElementById('export-tbody');
   tbody.innerHTML='';
-  const cls={include:'badge-include',exclude:'badge-exclude',uncertain:'badge-uncertain',skipped:'badge-skipped'};
   state.papers.forEach((p,i)=>{
     const fd=finalDecision(p);
     const tr=document.createElement('tr');
@@ -1572,7 +1574,7 @@ function renderExportTable() {
       <td class="col-auth">${esc(trunc(p.authors,40))}<br><small>${esc(p.year)}</small></td>
       <td>${esc(trunc(p.journal,40))}</td>
       <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
-      <td><span class="badge ${cls[fd]||''}">${fd||'—'}</span></td>
+      <td><span class="badge ${BADGE_CLASSES[fd]||''}">${fd||'—'}</span></td>
       <td class="col-rsn">${esc(p.aiReason)}</td>`;
     tbody.appendChild(tr);
   });
@@ -2142,8 +2144,8 @@ function showToast(msg,type='info') {
 
 // ── Model selection helpers ───────────────────────────────────────
 function readModelsFromUI(){
-  state.apiKey    = document.getElementById('api-key').value.trim();
-  state.ncbiKey   = document.getElementById('ncbi-key').value.trim();
+  state.apiKey    = (document.getElementById('api-key')?.value||'').trim();
+  state.ncbiKey   = (document.getElementById('ncbi-key')?.value||'').trim();
   state.openaiKey = (document.getElementById('openai-key')?.value||'').trim();
   state.geminiKey = (document.getElementById('gemini-key')?.value||'').trim();
   const pertask   = state.modelMode === 'pertask';
@@ -2176,7 +2178,7 @@ function onModelModeChange(){
     if(lbl) lbl.innerHTML='AI model <span class="opt-tag">(all tasks)</span>';
     if(hint) hint.textContent='Single model used for all AI tasks.';
     // Mirror analysis model to screening when in single mode
-    state.screeningModel = state.analysisModel;
+    state.screeningModel = document.getElementById('analysis-model')?.value || MODEL_SMART;
   }
 }
 
@@ -2188,10 +2190,7 @@ function onAnalysisModelChange(){
 // ── PRISMA Flow Check ─────────────────────────────────────────────
 async function checkPrismaFlow(){
   readModelsFromUI();
-  const d = computePrisma();
-  const identified = state.identifiedCount || d.total;
-  const dupes      = state.dupesRemoved    || 0;
-  const dbCounts   = state.dbCounts        || {};
+  const {d, identified, dupes, dbCounts} = assemblePrismaData();
   const dbList = Object.entries(dbCounts).filter(([,n])=>n>0).map(([db,n])=>`${dbLabel(db)} (n=${n})`).join(', ');
   const topReasons = Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]).slice(0,5)
     .map(([r,n])=>`"${r}" (n=${n})`).join(', ');
@@ -2277,6 +2276,9 @@ or {"decision":"uncertain","reason":"one sentence"}`;
 
   let done=0;
   const total=papers.length;
+  const fill=document.getElementById('verify-prog-fill');
+  const pctEl=document.getElementById('verify-prog-pct');
+  const txtEl=document.getElementById('verify-prog-txt');
 
   for(const paper of papers){
     if(state.verifyStopRequested) break;
@@ -2298,9 +2300,6 @@ or {"decision":"uncertain","reason":"one sentence"}`;
     }
     done++;
     const pct=Math.round(done/total*100);
-    const fill=document.getElementById('verify-prog-fill');
-    const pctEl=document.getElementById('verify-prog-pct');
-    const txtEl=document.getElementById('verify-prog-txt');
     if(fill) fill.style.width=pct+'%';
     if(pctEl) pctEl.textContent=pct+'%';
     if(txtEl) txtEl.textContent=`Verified ${done} of ${total} papers`;
@@ -2317,11 +2316,15 @@ or {"decision":"uncertain","reason":"one sentence"}`;
 
 function stopVerification(){ state.verifyStopRequested=true; }
 
-function renderVerifyReport(){
-  const disagreements=state.papers.filter(p=>
+function getDisagreements(){
+  return state.papers.filter(p=>
     p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
     p.verifyDecision !== finalDecision(p)
   );
+}
+
+function renderVerifyReport(){
+  const disagreements=getDisagreements();
   const out=document.getElementById('verify-out');
   out.style.display='block';
 
@@ -2331,14 +2334,11 @@ function renderVerifyReport(){
     return;
   }
 
-  const labels={include:'✅ Include',exclude:'❌ Exclude',uncertain:'❓ Uncertain'};
-  const cls={include:'badge-include',exclude:'badge-exclude',uncertain:'badge-uncertain'};
-
   const rows=disagreements.map(p=>`
     <tr>
       <td class="col-title"><div class="title-cell">${esc(trunc(p.title,80))}</div></td>
-      <td><span class="badge ${cls[p.manualDecision||p.aiDecision]||''}">${labels[p.manualDecision||p.aiDecision]||(p.manualDecision||p.aiDecision)}</span></td>
-      <td><span class="badge ${cls[p.verifyDecision]||''}">${labels[p.verifyDecision]||p.verifyDecision}</span></td>
+      <td><span class="badge ${BADGE_CLASSES[p.manualDecision||p.aiDecision]||''}">${BADGE_LABELS[p.manualDecision||p.aiDecision]||(p.manualDecision||p.aiDecision)}</span></td>
+      <td><span class="badge ${BADGE_CLASSES[p.verifyDecision]||''}">${BADGE_LABELS[p.verifyDecision]||p.verifyDecision}</span></td>
       <td class="col-rsn">${esc(p.verifyReason)}</td>
       <td><button class="btn btn-sm btn-secondary" onclick="acceptVerify('${esc(p.pmid)}')">Accept</button></td>
     </tr>`).join('');
@@ -2376,10 +2376,7 @@ function acceptVerify(pmid){
 }
 
 function acceptAllVerify(){
-  const disagreements=state.papers.filter(p=>
-    p.verifyDecision && p.aiDecision && p.aiDecision!=='skipped' &&
-    p.verifyDecision !== finalDecision(p)
-  );
+  const disagreements=getDisagreements();
   disagreements.forEach(p=>{ p.manualDecision=p.verifyDecision; updateBadgeRow(p); });
   renderVerifyReport();
   renderExportTable();
