@@ -153,7 +153,7 @@ Every push to the `main` branch on GitHub triggers an automatic redeploy on Rail
 
 ## Technical Details
 
-- **Tech stack**: Plain HTML/CSS/JS — no frontend frameworks
+- **Tech stack**: Plain HTML/CSS/JS — no frontend frameworks; fonts via Google Fonts (Crimson Pro + Inter)
 - **PubMed integration**: NCBI E-utilities API (free, no key required)
 - **Europe PMC integration**: EBI REST API (free, no key required)
 - **OpenAlex integration**: OpenAlex API (free key required since Feb 2026)

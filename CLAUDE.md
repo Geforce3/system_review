@@ -115,6 +115,7 @@ This is a systematic literature review assistant that works entirely in the brow
 - Only `index.html` is served; CLAUDE.md, README.md, and all other files return 404
 - Railway enforces HTTPS — Basic Auth credentials are always encrypted in transit
 - No user data is ever stored server-side; all processing is client-side in the browser
+- **Google Fonts CSP**: `style-src` includes `https://fonts.googleapis.com`; `font-src` includes `https://fonts.gstatic.com` — both added intentionally for font loading. If Railway injects CSP as a response header instead of reading the meta tag, these directives must also be added in `server.js` response headers.
 - DOI links validated against `/^10\.\d{4,}\/\S+$/` before constructing `https://doi.org/` URLs (open redirect prevention)
 - Error messages escaped with `esc()` before DOM insertion (XSS prevention)
 - All AI response text (PRISMA check, verification, narrative) inserted via `textContent` or `esc()` — never raw `innerHTML`
