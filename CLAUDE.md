@@ -12,11 +12,12 @@ This is a systematic literature review assistant that works entirely in the brow
   - Gemini: `gemini-2.5-pro-preview-05-06`, `gemini-2.0-flash`
 - **Default model tiering** (when user hasn't changed selections):
   - Screening model default: `claude-haiku-4-5-20251001` — criteria generation and per-paper screening
-  - Analysis model default: `claude-sonnet-4-6` — synthesis, PRISMA narrative, verification
+  - Verification model default: `claude-sonnet-4-6` — decision verification pass
+  - Analysis model default: `claude-sonnet-4-6` — synthesis, PRISMA narrative
 - **Model selection modes** (toggle in Stage 1):
   - Single mode: one model for all tasks
-  - Per-task mode: separate screening model and analysis model
-- All model selections stored in `state.screeningModel` and `state.analysisModel`
+  - Per-task mode: separate screening model, verification model, and analysis model
+- All model selections stored in `state.screeningModel`, `state.verifyModel`, and `state.analysisModel`
 - `readModelsFromUI()` reads all keys and model selections from the DOM into state — call this at the start of any AI function that may run without going through `searchAll()`
 - Claude API calls must include headers:
   ```
@@ -229,7 +230,7 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - Button: "🔍 Check PRISMA Flow" in the PRISMA Narrative card header
 
 ### Decision Verification (new)
-- `verifyDecisions()` — second AI pass re-screens all papers using `state.analysisModel`
+- `verifyDecisions()` — second AI pass re-screens all papers using `state.verifyModel`
 - Stores results in `paper.verifyDecision` and `paper.verifyReason` (neither replaces `aiDecision`)
 - `getDisagreements()` — shared helper returning papers where `verifyDecision !== finalDecision(p)`; used by `renderVerifyReport()` and `acceptAllVerify()` — do not inline this filter again
 - `renderVerifyReport()` — shows disagreement table (papers where `verifyDecision !== current decision`)
@@ -250,6 +251,24 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - Expandable abstract rows
 - Clean, professional light color scheme
 - Per-database breakdown in PRISMA flow section
+
+### Relevance Score
+- `paper.relevanceScore` — integer 0–100, set by `screenOne()` during the AI screening pass; `null` for skipped papers (no abstract)
+- Stored as a field on each paper and included in CSV export under column `Relevance (%)`
+- Displayed in both the screening table and export table; rendered by `relHtml(score)` helper
+- CSS classes: `.rel-high` (≥70, green), `.rel-mid` (40–69, amber), `.rel-low` (<40, red), `.rel-na` (null, muted)
+- The AI is given `state.query` in the `screenOne()` prompt so it can assess topical relevance to the original search terms, independent of the inclusion/exclusion decision
+- If verification re-runs papers, `relevanceScore` is not overwritten (set only during initial screening)
+
+### MeSH Term Checker
+- `checkMeshTerms()` — looks up NCBI MeSH descriptors for key terms extracted from the user's query
+- Calls `readModelsFromUI()` first to pick up `state.ncbiKey` (optional, raises NCBI rate limit)
+- Tokenises the query (lowercased, split on whitespace/punctuation, stop-words filtered, min 3 chars, max 10 terms)
+- For each term: `GET https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=mesh&term=<term>[MeSH Terms]&retmax=3`
+- Batch-fetches summaries: `GET esummary.fcgi?db=mesh&id=<ids>` — parses `ds_meshterms[0]` for canonical label
+- Results shown in `#mesh-card` / `#mesh-out`; hidden until first run, closeable
+- `insertMeshTerm(btn)` — reads `btn.dataset.mesh` (escaped via `esc()`) and appends `"Term"[MeSH Terms]` to `#pubmed-query-field`; also shows strategy card if not yet visible
+- XSS: MeSH labels from NCBI wrapped in `esc()` before innerHTML; `data-mesh` attribute set via `esc()`; `dataset.mesh` read and inserted into `field.value` (not DOM)
 
 ### Search Strategy Builder
 - **Opt-in** — user clicks "Build Search Strategy" before running the search

@@ -132,6 +132,10 @@ input[type="file"]{display:none}
 .badge-skipped:hover{opacity:1;transform:none}
 .badge-pending{background:#EFF6FF;color:#1D4ED8}
 .badge-manual{outline:2px solid currentColor;outline-offset:1px}
+.rel-high{color:#16a34a;font-weight:600}
+.rel-mid{color:#d97706;font-weight:600}
+.rel-low{color:#dc2626;font-weight:600}
+.rel-na{color:var(--muted)}
 
 /* Table */
 .tbl-wrap{overflow-x:auto}
@@ -356,8 +360,8 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="max-results">Max Results per Database <span class="opt-tag">(1–500)</span></label>
-        <input type="number" id="max-results" value="100" min="1" max="500">
+        <label for="max-results">Max Results per Database <span class="opt-tag">(1–1000)</span></label>
+        <input type="number" id="max-results" value="100" min="1" max="1000">
       </div>
       <div class="form-group">
         <label for="api-key">Claude API Key</label>
@@ -409,6 +413,10 @@ tbody tr:last-child td{border-bottom:none}
         <label for="screening-model">Screening model <span class="opt-tag">(criteria + per-paper screening)</span></label>
         <select id="screening-model" onchange="state.screeningModel=this.value"></select>
       </div>
+      <div class="form-group" id="verify-model-group" style="display:none">
+        <label for="verify-model">Verification model <span class="opt-tag">(decision verification pass)</span></label>
+        <select id="verify-model" onchange="state.verifyModel=this.value"></select>
+      </div>
       <div class="form-group">
         <label for="analysis-model" id="analysis-model-label">AI model <span class="opt-tag">(all tasks)</span></label>
         <select id="analysis-model" onchange="onAnalysisModelChange()"></select>
@@ -418,6 +426,7 @@ tbody tr:last-child td{border-bottom:none}
 
   <div class="btn-group">
     <button class="btn btn-secondary" id="btn-build-strategy" onclick="buildStrategy()">🧠 Build Search Strategy</button>
+    <button class="btn btn-secondary" id="btn-check-mesh"     onclick="checkMeshTerms()">🏷️ Check MeSH Terms</button>
     <button class="btn btn-primary"   id="btn-search"         onclick="searchAll()">🔍 Search Selected Databases</button>
   </div>
 
@@ -461,6 +470,15 @@ tbody tr:last-child td{border-bottom:none}
     <div class="btn-group" style="margin-top:4px;">
       <button class="btn btn-sm btn-danger" onclick="clearStrategy()">✕ Clear Strategy</button>
     </div>
+  </div>
+
+  <!-- MeSH card — hidden until checkMeshTerms() runs -->
+  <div class="card" id="mesh-card" style="display:none;margin-top:16px;">
+    <div class="card-title">🏷️ MeSH Term Suggestions
+      <button class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="document.getElementById('mesh-card').style.display='none'">✕ Close</button>
+    </div>
+    <p class="info" style="margin-bottom:10px;">Matched MeSH (Medical Subject Headings) terms for your search concepts. Using MeSH tags in your PubMed query improves recall and precision.</p>
+    <div id="mesh-out"></div>
   </div>
 
   <div id="search-status" style="margin-top:14px;font-size:13px;"></div>
@@ -519,6 +537,7 @@ tbody tr:last-child td{border-bottom:none}
             <th class="col-title">Title</th>
             <th class="col-auth">Authors / Year</th>
             <th style="width:90px">Source</th>
+            <th style="width:75px">Relevance</th>
             <th class="col-dec">Decision</th>
             <th class="col-rsn">AI Reason</th>
           </tr>
@@ -587,7 +606,7 @@ tbody tr:last-child td{border-bottom:none}
 
   <div class="card">
     <div class="card-title">🔍 Verify Screening Decisions</div>
-    <p class="info" style="margin-bottom:12px;">Run a second AI pass on all screened papers using your <strong>analysis model</strong>. Papers where the verification decision differs from the original are flagged in a disagreement report — you can then accept or reject the suggested changes.</p>
+    <p class="info" style="margin-bottom:12px;">Run a second AI pass on all screened papers using your <strong>verification model</strong>. Papers where the verification decision differs from the original are flagged in a disagreement report — you can then accept or reject the suggested changes.</p>
     <div class="btn-group">
       <button class="btn btn-primary" id="btn-verify" onclick="verifyDecisions()">🔍 Verify All Decisions</button>
       <button class="btn btn-danger"  id="btn-verify-stop" onclick="stopVerification()" disabled>⏹ Stop</button>
@@ -622,6 +641,7 @@ tbody tr:last-child td{border-bottom:none}
             <th class="col-auth">Authors / Year</th>
             <th>Journal</th>
             <th style="width:90px">Source</th>
+            <th style="width:75px">Relevance</th>
             <th class="col-dec">Final Decision</th>
             <th class="col-rsn">Reason</th>
           </tr>
@@ -720,7 +740,7 @@ const state = {
   screeningActive:false, screeningPaused:false, stopRequested:false,
   screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1,
   identifiedCount:0, dupesRemoved:0, dbCounts:{},
-  modelMode:'single', screeningModel:MODEL_FAST, analysisModel:MODEL_SMART,
+  modelMode:'single', screeningModel:MODEL_FAST, analysisModel:MODEL_SMART, verifyModel:MODEL_SMART,
   verifyStopRequested:false
 };
 let overridePmid = null;
@@ -1244,10 +1264,13 @@ async function screenOne(paper) {
 Criteria:
 ${state.criteria}
 
+Also score how topically relevant this paper is to the search query: "${state.query}"
+
 Reply ONLY with valid JSON (no markdown):
-{"decision":"include","reason":"one sentence"}
-or {"decision":"exclude","reason":"one sentence"}
-or {"decision":"uncertain","reason":"one sentence"}`;
+{"decision":"include","reason":"one sentence","relevance":85}
+or {"decision":"exclude","reason":"one sentence","relevance":30}
+or {"decision":"uncertain","reason":"one sentence","relevance":55}
+where relevance is 0–100 (100 = perfectly on-topic, 0 = completely unrelated to the search query).`;
   try {
     const txt=await callAI(
       [{role:'user',content:`Title: ${paper.title}\n\nAbstract: ${paper.abstract}`}],
@@ -1258,6 +1281,7 @@ or {"decision":"uncertain","reason":"one sentence"}`;
     const obj=JSON.parse(m[0]);
     paper.aiDecision=['include','exclude','uncertain'].includes(obj.decision)?obj.decision:'uncertain';
     paper.aiReason=obj.reason||'';
+    paper.relevanceScore=typeof obj.relevance==='number'?Math.min(100,Math.max(0,Math.round(obj.relevance))):null;
   } catch(e) {
     paper.aiDecision='uncertain';
     paper.aiReason='Screening error — manual review recommended';
@@ -1295,9 +1319,16 @@ function buildRow(p,i) {
     </td>
     <td class="col-auth">${esc(trunc(p.authors,55))}<br><small>${esc(p.year)}</small></td>
     <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
+    <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
     <td class="col-dec" id="dec-${p.pmid}">${badgeHtml(p)}</td>
     <td class="col-rsn" id="rsn-${p.pmid}">${esc(p.aiReason)}</td>`;
   return tr;
+}
+
+function relHtml(score){
+  if(score==null) return '<span class="rel-na">—</span>';
+  const cls=score>=70?'rel-high':score>=40?'rel-mid':'rel-low';
+  return `<span class="${cls}">${score}%</span>`;
 }
 
 function badgeHtml(p) {
@@ -1574,6 +1605,7 @@ function renderExportTable() {
       <td class="col-auth">${esc(trunc(p.authors,40))}<br><small>${esc(p.year)}</small></td>
       <td>${esc(trunc(p.journal,40))}</td>
       <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
+      <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
       <td><span class="badge ${BADGE_CLASSES[fd]||''}">${fd||'—'}</span></td>
       <td class="col-rsn">${esc(p.aiReason)}</td>`;
     tbody.appendChild(tr);
@@ -1585,10 +1617,10 @@ function csvField(v){ return '"'+String(v??'').replace(/"/g,'""')+'"'; }
 
 function exportCSV() {
   const hdr=['PMID','Title','Authors','Year','Journal','DOI','Abstract','Source',
-             'AI Decision','AI Reason','Manual Override','Final Decision'];
+             'Relevance (%)','AI Decision','AI Reason','Manual Override','Final Decision'];
   const rows=state.papers.map(p=>[
     p.pmid,p.title,p.authors,p.year,p.journal,p.doi,p.abstract,p.source||'',
-    p.aiDecision,p.aiReason,p.manualDecision,finalDecision(p)
+    p.relevanceScore??'',p.aiDecision,p.aiReason,p.manualDecision,finalDecision(p)
   ].map(csvField).join(','));
   dlFile([hdr.join(','),...rows].join('\r\n'),'systematic_review_results.csv','text/csv');
   showToast('CSV downloaded.','success');
@@ -1999,6 +2031,118 @@ function confirmBackToSearch(){
   );
 }
 
+// ── MeSH Term Checker ─────────────────────────────────────────────
+async function checkMeshTerms(){
+  readModelsFromUI();
+  const rawQuery = (document.getElementById('pubmed-query-field')?.value.trim() ||
+                    document.getElementById('query')?.value.trim() || '').toLowerCase();
+  if(!rawQuery){ showToast('Please enter a search query first.','error'); return; }
+
+  const btn = document.getElementById('btn-check-mesh');
+  btn.disabled = true;
+  btn.textContent = '⏳ Checking MeSH…';
+
+  // Tokenise: split on spaces and common boolean/punctuation, keep words ≥3 chars
+  const STOP = new Set(['and','not','the','for','with','from','that','this','are',
+                        'was','has','have','its','been','than','into','over',
+                        'mesh','terms','title','abstract','majr']);
+  const terms = [...new Set(
+    rawQuery.split(/[\s+\-(),\[\]"\/]+/)
+      .map(t=>t.replace(/[^a-z]/g,''))
+      .filter(t=>t.length>=3 && !STOP.has(t))
+  )].slice(0,10); // max 10 terms to keep API calls manageable
+
+  if(!terms.length){
+    showToast('No keywords found to look up.','error');
+    btn.disabled=false; btn.textContent='🏷️ Check MeSH Terms';
+    return;
+  }
+
+  const ncbiBase = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
+  const keyParam = state.ncbiKey ? `&api_key=${encodeURIComponent(state.ncbiKey)}` : '';
+
+  try {
+    // Step 1: for each term, search the MeSH db to get descriptor IDs
+    const termResults = await Promise.all(terms.map(async t => {
+      try {
+        const r = await fetch(`${ncbiBase}esearch.fcgi?db=mesh&term=${encodeURIComponent(t+'[MeSH Terms]')}&retmode=json&retmax=3${keyParam}`);
+        const j = await r.json();
+        return { term: t, ids: j.esearchresult?.idlist || [] };
+      } catch { return { term: t, ids: [] }; }
+    }));
+
+    // Step 2: batch-fetch summaries for all found IDs
+    const allIds = [...new Set(termResults.flatMap(r=>r.ids))];
+    let summaryMap = {};
+    if(allIds.length){
+      const r = await fetch(`${ncbiBase}esummary.fcgi?db=mesh&id=${allIds.join(',')}&retmode=json${keyParam}`);
+      const j = await r.json();
+      const result = j.result || {};
+      for(const id of (result.uids||[])){
+        const entry = result[id];
+        // ds_meshterms is an array; first entry is the preferred term
+        const label = (entry?.ds_meshterms?.[0]) || (entry?.ds_meshui) || null;
+        if(label) summaryMap[id] = label;
+      }
+    }
+
+    // Step 3: build per-term MeSH lookup map
+    const rows = termResults.map(({term, ids}) => {
+      const meshLabels = ids.map(id=>summaryMap[id]).filter(Boolean);
+      return { term, meshLabels };
+    });
+
+    // Render into #mesh-out
+    const card = document.getElementById('mesh-card');
+    const out  = document.getElementById('mesh-out');
+    card.style.display = 'block';
+
+    const tableRows = rows.map(({term, meshLabels}) => {
+      if(!meshLabels.length){
+        return `<tr><td><code>${esc(term)}</code></td><td><span style="color:var(--muted);font-size:12px">No MeSH match — use as keyword</span></td><td></td></tr>`;
+      }
+      const pills = meshLabels.map(lbl =>
+        `<span class="src-badge" style="margin-right:4px">${esc(lbl)}</span>`
+      ).join('');
+      // Copy button: inserts first match as MeSH syntax into PubMed query field
+      const meshSyntax = `"${meshLabels[0]}"[MeSH Terms]`;
+      return `<tr>
+        <td><code>${esc(term)}</code></td>
+        <td>${pills}</td>
+        <td><button class="btn btn-sm btn-secondary" data-mesh="${esc(meshSyntax)}" onclick="insertMeshTerm(this)">📋 Insert</button></td>
+      </tr>`;
+    }).join('');
+
+    out.innerHTML = `<div class="tbl-wrap"><table>
+      <thead><tr><th>Your term</th><th>MeSH descriptor(s)</th><th>Action</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <p class="info" style="margin-top:8px;font-size:12px">Click <strong>Insert</strong> to append the MeSH tag to your PubMed query field. Edit freely before searching.</p>`;
+
+  } catch(e){
+    showToast('MeSH lookup failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled=false;
+    btn.textContent='🏷️ Check MeSH Terms';
+  }
+}
+
+function insertMeshTerm(btn){
+  const meshSyntax = btn.dataset.mesh;
+  if(!meshSyntax) return;
+  const field = document.getElementById('pubmed-query-field');
+  // Ensure strategy card is visible (create field if not already shown)
+  if(field){
+    document.getElementById('strategy-card').style.display='block';
+    field.value = field.value ? field.value + ' AND ' + meshSyntax : meshSyntax;
+    showToast('MeSH term added to PubMed query.','success');
+  } else {
+    // Fall back: copy to clipboard
+    navigator.clipboard?.writeText(meshSyntax).then(()=>showToast('Copied to clipboard: '+meshSyntax,'success'))
+      .catch(()=>showToast('MeSH term: '+meshSyntax,'info'));
+  }
+}
+
 // ── Search Strategy Builder ───────────────────────────────────────
 async function buildStrategy(){
   const query = document.getElementById('query').value.trim();
@@ -2153,13 +2297,18 @@ function readModelsFromUI(){
   state.screeningModel = pertask
     ? (document.getElementById('screening-model')?.value || MODEL_FAST)
     : state.analysisModel;
+  state.verifyModel = pertask
+    ? (document.getElementById('verify-model')?.value || MODEL_SMART)
+    : state.analysisModel;
 }
 
 function populateModelDropdowns(){
   const opts = MODELS.map(m=>`<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('');
   const sm = document.getElementById('screening-model');
+  const vm = document.getElementById('verify-model');
   const am = document.getElementById('analysis-model');
   if(sm){ sm.innerHTML=opts; sm.value=state.screeningModel; }
+  if(vm){ vm.innerHTML=opts; vm.value=state.verifyModel; }
   if(am){ am.innerHTML=opts; am.value=state.analysisModel; }
 }
 
@@ -2167,24 +2316,28 @@ function onModelModeChange(){
   const pertask = document.getElementById('model-mode-toggle').checked;
   state.modelMode = pertask ? 'pertask' : 'single';
   const sg  = document.getElementById('screening-model-group');
+  const vg  = document.getElementById('verify-model-group');
   const lbl = document.getElementById('analysis-model-label');
   const hint= document.getElementById('model-mode-hint');
   if(pertask){
     if(sg)  sg.style.display='block';
-    if(lbl) lbl.innerHTML='Analysis model <span class="opt-tag">(synthesis, PRISMA, verification)</span>';
-    if(hint) hint.textContent='Screening and analysis tasks use separate models.';
+    if(vg)  vg.style.display='block';
+    if(lbl) lbl.innerHTML='Analysis model <span class="opt-tag">(synthesis, PRISMA)</span>';
+    if(hint) hint.textContent='Screening, verification, and analysis tasks use separate models.';
   } else {
     if(sg)  sg.style.display='none';
+    if(vg)  vg.style.display='none';
     if(lbl) lbl.innerHTML='AI model <span class="opt-tag">(all tasks)</span>';
     if(hint) hint.textContent='Single model used for all AI tasks.';
-    // Mirror analysis model to screening when in single mode
+    // Mirror analysis model to screening and verification when in single mode
     state.screeningModel = document.getElementById('analysis-model')?.value || MODEL_SMART;
+    state.verifyModel    = state.screeningModel;
   }
 }
 
 function onAnalysisModelChange(){
   state.analysisModel = document.getElementById('analysis-model')?.value || MODEL_SMART;
-  if(state.modelMode === 'single') state.screeningModel = state.analysisModel;
+  if(state.modelMode === 'single'){ state.screeningModel = state.analysisModel; state.verifyModel = state.analysisModel; }
 }
 
 // ── PRISMA Flow Check ─────────────────────────────────────────────
@@ -2285,7 +2438,7 @@ or {"decision":"uncertain","reason":"one sentence"}`;
     try {
       const txt=await callAI(
         [{role:'user',content:`Title: ${paper.title}\n\nAbstract: ${paper.abstract}`}],
-        sys, state.analysisModel
+        sys, state.verifyModel
       );
       const m=txt.match(/\{[\s\S]*\}/);
       if(m){
