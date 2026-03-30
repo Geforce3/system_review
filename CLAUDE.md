@@ -273,14 +273,16 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - Use low-confidence papers as a prioritised manual review queue
 
 ### MeSH Term Checker
-- `checkMeshTerms()` — looks up NCBI MeSH descriptors for key terms extracted from the user's query
+- `checkMeshTerms()` — uses `esearch.fcgi?db=pubmed&retmax=0` (same endpoint as regular PubMed searches) to get PubMed's automatic MeSH mapping for the user's query; **do NOT use `db=mesh`** — that endpoint has CORS issues in browser contexts
 - Calls `readModelsFromUI()` first to pick up `state.ncbiKey` (optional, raises NCBI rate limit)
-- Tokenises the query (lowercased, split on whitespace/punctuation, stop-words filtered, min 3 chars, max 10 terms)
-- For each term: `GET https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=mesh&term=<term>[MeSH Terms]&retmax=3`
-- Batch-fetches summaries: `GET esummary.fcgi?db=mesh&id=<ids>` — parses `ds_meshterms[0]` for canonical label
+- Reads query from `#query` input only (the raw user query, not the generated PubMed field)
+- Response fields used: `esearchresult.querytranslation` (full MeSH-expanded query string), `esearchresult.translationset` (per-term `{from, to}` array)
+- MeSH term names extracted from `querytranslation` via regex `/"([^"]+)"\[MeSH Terms\]/gi`
+- `_meshTranslation` module-level variable stores the full translation for `applyMeshTranslation()`
+- `applyMeshTranslation()` — "↩ Use" button copies full translation into `#pubmed-query-field`
+- `insertMeshTerm(el)` — reads `el.dataset.mesh` and appends `"Term"[MeSH Terms]` to `#pubmed-query-field`; shows strategy card if not yet visible
 - Results shown in `#mesh-card` / `#mesh-out`; hidden until first run, closeable
-- `insertMeshTerm(btn)` — reads `btn.dataset.mesh` (escaped via `esc()`) and appends `"Term"[MeSH Terms]` to `#pubmed-query-field`; also shows strategy card if not yet visible
-- XSS: MeSH labels from NCBI wrapped in `esc()` before innerHTML; `data-mesh` attribute set via `esc()`; `dataset.mesh` read and inserted into `field.value` (not DOM)
+- XSS: all NCBI API values (`queryTranslation`, `from`, `to`, MeSH names) wrapped in `esc()` before innerHTML; `data-mesh` attribute set via `esc()`; `dataset.mesh` inserted into `field.value` (not DOM)
 
 ### Search Strategy Builder
 - **Opt-in** — user clicks "Build Search Strategy" before running the search

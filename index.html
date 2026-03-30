@@ -2063,92 +2063,86 @@ function confirmBackToSearch(){
 }
 
 // ── MeSH Term Checker ─────────────────────────────────────────────
+// Uses db=pubmed esearch (same endpoint as regular PubMed searches — no CORS issues).
+// PubMed auto-maps queries to MeSH; querytranslation and translationset expose those mappings.
+let _meshTranslation = ''; // stored for applyMeshTranslation()
+
 async function checkMeshTerms(){
   readModelsFromUI();
-  const rawQuery = (document.getElementById('pubmed-query-field')?.value.trim() ||
-                    document.getElementById('query')?.value.trim() || '').toLowerCase();
+  const rawQuery = (document.getElementById('query')?.value.trim() || '');
   if(!rawQuery){ showToast('Please enter a search query first.','error'); return; }
 
   const btn = document.getElementById('btn-check-mesh');
   btn.disabled = true;
   btn.textContent = '⏳ Checking MeSH…';
 
-  // Tokenise: split on spaces and common boolean/punctuation, keep words ≥3 chars
-  const STOP = new Set(['and','not','the','for','with','from','that','this','are',
-                        'was','has','have','its','been','than','into','over',
-                        'mesh','terms','title','abstract','majr']);
-  const terms = [...new Set(
-    rawQuery.split(/[\s+\-(),\[\]"\/]+/)
-      .map(t=>t.replace(/[^a-z]/g,''))
-      .filter(t=>t.length>=3 && !STOP.has(t))
-  )].slice(0,10); // max 10 terms to keep API calls manageable
-
-  if(!terms.length){
-    showToast('No keywords found to look up.','error');
-    btn.disabled=false; btn.textContent='🏷️ Check MeSH Terms';
-    return;
-  }
-
   const ncbiBase = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
   const keyParam = state.ncbiKey ? `&api_key=${encodeURIComponent(state.ncbiKey)}` : '';
 
   try {
-    // Step 1: for each term, search the MeSH db to get descriptor IDs
-    const termResults = await Promise.all(terms.map(async t => {
-      try {
-        const r = await fetch(`${ncbiBase}esearch.fcgi?db=mesh&term=${encodeURIComponent(t+'[MeSH Terms]')}&retmode=json&retmax=3${keyParam}`);
-        const j = await r.json();
-        return { term: t, ids: j.esearchresult?.idlist || [] };
-      } catch { return { term: t, ids: [] }; }
-    }));
+    const r = await fetch(
+      `${ncbiBase}esearch.fcgi?db=pubmed&term=${encodeURIComponent(rawQuery)}&retmax=0&retmode=json${keyParam}`
+    );
+    if(!r.ok) throw new Error(`NCBI returned HTTP ${r.status}`);
+    const j = await r.json();
 
-    // Step 2: batch-fetch summaries for all found IDs
-    const allIds = [...new Set(termResults.flatMap(r=>r.ids))];
-    let summaryMap = {};
-    if(allIds.length){
-      const r = await fetch(`${ncbiBase}esummary.fcgi?db=mesh&id=${allIds.join(',')}&retmode=json${keyParam}`);
-      const j = await r.json();
-      const result = j.result || {};
-      for(const id of (result.uids||[])){
-        const entry = result[id];
-        // ds_meshterms is an array; first entry is the preferred term
-        const label = (entry?.ds_meshterms?.[0]) || (entry?.ds_meshui) || null;
-        if(label) summaryMap[id] = label;
-      }
-    }
+    const queryTranslation = j.esearchresult?.querytranslation || '';
+    const translationSet   = j.esearchresult?.translationset   || [];
+    _meshTranslation = queryTranslation;
 
-    // Step 3: build per-term MeSH lookup map
-    const rows = termResults.map(({term, ids}) => {
-      const meshLabels = ids.map(id=>summaryMap[id]).filter(Boolean);
-      return { term, meshLabels };
-    });
+    // Extract distinct MeSH term names from the translation string
+    const meshTerms = [...new Set(
+      [...queryTranslation.matchAll(/"([^"]+)"\[MeSH Terms\]/gi)].map(m => m[1])
+    )];
 
-    // Render into #mesh-out
     const card = document.getElementById('mesh-card');
     const out  = document.getElementById('mesh-out');
     card.style.display = 'block';
 
-    const tableRows = rows.map(({term, meshLabels}) => {
-      if(!meshLabels.length){
-        return `<tr><td><code>${esc(term)}</code></td><td><span style="color:var(--muted);font-size:12px">No MeSH match — use as keyword</span></td><td></td></tr>`;
-      }
-      const pills = meshLabels.map(lbl =>
-        `<span class="src-badge" style="margin-right:4px">${esc(lbl)}</span>`
-      ).join('');
-      // Copy button: inserts first match as MeSH syntax into PubMed query field
-      const meshSyntax = `"${meshLabels[0]}"[MeSH Terms]`;
-      return `<tr>
-        <td><code>${esc(term)}</code></td>
-        <td>${pills}</td>
-        <td><button class="btn btn-sm btn-secondary" data-mesh="${esc(meshSyntax)}" onclick="insertMeshTerm(this)">📋 Insert</button></td>
-      </tr>`;
-    }).join('');
+    let html = '';
 
-    out.innerHTML = `<div class="tbl-wrap"><table>
-      <thead><tr><th>Your term</th><th>MeSH descriptor(s)</th><th>Action</th></tr></thead>
-      <tbody>${tableRows}</tbody>
-    </table></div>
-    <p class="info" style="margin-top:8px;font-size:12px">Click <strong>Insert</strong> to append the MeSH tag to your PubMed query field. Edit freely before searching.</p>`;
+    // Full PubMed translation block
+    if(queryTranslation){
+      html += `<div style="margin-bottom:14px">
+        <p class="info" style="margin-bottom:4px"><strong>PubMed auto-translation</strong> <span style="color:var(--muted);font-size:12px">— how PubMed expands your query with MeSH</span></p>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <code style="flex:1;display:block;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 10px;border-radius:6px;font-size:12px;line-height:1.6;word-break:break-all">${esc(queryTranslation)}</code>
+          <button class="btn btn-sm btn-secondary" onclick="applyMeshTranslation()" title="Replace the PubMed query field with this translation">↩ Use</button>
+        </div>
+      </div>`;
+    }
+
+    // MeSH term badges
+    if(meshTerms.length){
+      const badges = meshTerms.map(t => {
+        const syntax = `"${t}"[MeSH Terms]`;
+        return `<span class="src-badge" style="cursor:pointer;margin:2px" data-mesh="${esc(syntax)}" onclick="insertMeshTerm(this)">${esc(t)} <small>＋</small></span>`;
+      }).join('');
+      html += `<div style="margin-bottom:12px">
+        <p class="info" style="margin-bottom:6px"><strong>MeSH terms identified</strong> <span style="color:var(--muted);font-size:12px">— click to insert into PubMed query</span></p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
+      </div>`;
+    } else if(queryTranslation){
+      html += `<p class="info">No MeSH terms were auto-mapped — PubMed will search your terms as free-text keywords.</p>`;
+    } else {
+      html += `<p class="info">PubMed did not return a translation for this query.</p>`;
+    }
+
+    // Per-term breakdown (collapsible)
+    if(translationSet.length){
+      const trows = translationSet.map(({from, to}) =>
+        `<tr><td><code>${esc(from)}</code></td><td style="font-size:12px;font-family:monospace;word-break:break-all">${esc(to)}</td></tr>`
+      ).join('');
+      html += `<details style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--muted)">▶ Term-by-term PubMed expansion</summary>
+        <div class="tbl-wrap" style="margin-top:6px"><table>
+          <thead><tr><th>Your term</th><th>PubMed expansion</th></tr></thead>
+          <tbody>${trows}</tbody>
+        </table></div>
+      </details>`;
+    }
+
+    out.innerHTML = html;
 
   } catch(e){
     showToast('MeSH lookup failed: ' + e.message, 'error');
@@ -2158,18 +2152,27 @@ async function checkMeshTerms(){
   }
 }
 
-function insertMeshTerm(btn){
-  const meshSyntax = btn.dataset.mesh;
+function applyMeshTranslation(){
+  if(!_meshTranslation) return;
+  const field = document.getElementById('pubmed-query-field');
+  if(field){
+    document.getElementById('strategy-card').style.display='block';
+    field.value = _meshTranslation;
+    showToast('PubMed query updated with MeSH translation.','success');
+  }
+}
+
+function insertMeshTerm(el){
+  const meshSyntax = el.dataset.mesh;
   if(!meshSyntax) return;
   const field = document.getElementById('pubmed-query-field');
-  // Ensure strategy card is visible (create field if not already shown)
   if(field){
     document.getElementById('strategy-card').style.display='block';
     field.value = field.value ? field.value + ' AND ' + meshSyntax : meshSyntax;
     showToast('MeSH term added to PubMed query.','success');
   } else {
-    // Fall back: copy to clipboard
-    navigator.clipboard?.writeText(meshSyntax).then(()=>showToast('Copied to clipboard: '+meshSyntax,'success'))
+    navigator.clipboard?.writeText(meshSyntax)
+      .then(()=>showToast('Copied: '+meshSyntax,'success'))
       .catch(()=>showToast('MeSH term: '+meshSyntax,'info'));
   }
 }
