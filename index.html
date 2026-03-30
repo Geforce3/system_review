@@ -539,6 +539,7 @@ tbody tr:last-child td{border-bottom:none}
             <th style="width:90px">Source</th>
             <th style="width:75px">Relevance</th>
             <th class="col-dec">Decision</th>
+            <th style="width:80px">Confidence</th>
             <th class="col-rsn">AI Reason</th>
           </tr>
         </thead>
@@ -643,6 +644,7 @@ tbody tr:last-child td{border-bottom:none}
             <th style="width:90px">Source</th>
             <th style="width:75px">Relevance</th>
             <th class="col-dec">Final Decision</th>
+            <th style="width:80px">Confidence</th>
             <th class="col-rsn">Reason</th>
           </tr>
         </thead>
@@ -870,6 +872,7 @@ async function searchAll(){
     const dupeNote=dupes>0?` <span style="color:var(--muted)">(${dupes} duplicate${dupes!==1?'s':''} removed)</span>`:'';
     setStatus('search-status',`✅ <strong>${state.papers.length}</strong> papers loaded${dupeNote} — ${parts}`);
 
+    computeRelevanceScores();
     renderPapersTable();
     updatePapersCount();
     document.getElementById('btn-save').disabled=false;
@@ -1264,13 +1267,11 @@ async function screenOne(paper) {
 Criteria:
 ${state.criteria}
 
-Also score how topically relevant this paper is to the search query: "${state.query}"
-
 Reply ONLY with valid JSON (no markdown):
-{"decision":"include","reason":"one sentence","relevance":85}
-or {"decision":"exclude","reason":"one sentence","relevance":30}
-or {"decision":"uncertain","reason":"one sentence","relevance":55}
-where relevance is 0–100 (100 = perfectly on-topic, 0 = completely unrelated to the search query).`;
+{"decision":"include","reason":"one sentence","confidence":82}
+or {"decision":"exclude","reason":"one sentence","confidence":91}
+or {"decision":"uncertain","reason":"one sentence","confidence":40}
+where confidence is 0–100: how certain you are in this decision given how clearly the abstract matches or fails the criteria (100 = unambiguous, 0 = impossible to judge).`;
   try {
     const txt=await callAI(
       [{role:'user',content:`Title: ${paper.title}\n\nAbstract: ${paper.abstract}`}],
@@ -1281,7 +1282,7 @@ where relevance is 0–100 (100 = perfectly on-topic, 0 = completely unrelated t
     const obj=JSON.parse(m[0]);
     paper.aiDecision=['include','exclude','uncertain'].includes(obj.decision)?obj.decision:'uncertain';
     paper.aiReason=obj.reason||'';
-    paper.relevanceScore=typeof obj.relevance==='number'?Math.min(100,Math.max(0,Math.round(obj.relevance))):null;
+    paper.confidenceScore=typeof obj.confidence==='number'?Math.min(100,Math.max(0,Math.round(obj.confidence))):null;
   } catch(e) {
     paper.aiDecision='uncertain';
     paper.aiReason='Screening error — manual review recommended';
@@ -1294,6 +1295,26 @@ function togglePause() {
   document.getElementById('btn-pause').textContent=state.screeningPaused?'▶ Resume':'⏸ Pause';
 }
 function stopScreening(){ state.stopRequested=true; state.screeningPaused=false; }
+
+// ── Relevance scoring (keyword-based, independent of criteria) ───
+function computeRelevanceScores() {
+  const STOP = new Set(['and','or','not','the','for','with','from','that','this',
+                        'are','was','has','have','its','been','than','into','over',
+                        'mesh','terms','title','abstract','majr']);
+  const terms = state.query.toLowerCase()
+    .split(/[\s+\-(),\[\]"\/]+/)
+    .map(t => t.replace(/[^a-z]/g,''))
+    .filter(t => t.length >= 3 && !STOP.has(t));
+  if(!terms.length){ state.papers.forEach(p=>{ p.relevanceScore=null; }); return; }
+  state.papers.forEach(p => {
+    const title    = p.title.toLowerCase();
+    const abstract = p.abstract.toLowerCase();
+    const titleHits    = terms.filter(t => title.includes(t)).length;
+    const abstractHits = terms.filter(t => abstract.includes(t)).length;
+    // Title match weighted 2×; max possible = 3 pts per term
+    p.relevanceScore = Math.min(100, Math.round((titleHits * 2 + abstractHits) / (terms.length * 3) * 100));
+  });
+}
 
 // ── Table rendering ──────────────────────────────────────────────
 function renderPapersTable() {
@@ -1321,11 +1342,18 @@ function buildRow(p,i) {
     <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
     <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
     <td class="col-dec" id="dec-${p.pmid}">${badgeHtml(p)}</td>
+    <td style="text-align:center" id="conf-${p.pmid}">${confHtml(p.confidenceScore??null)}</td>
     <td class="col-rsn" id="rsn-${p.pmid}">${esc(p.aiReason)}</td>`;
   return tr;
 }
 
 function relHtml(score){
+  if(score==null) return '<span class="rel-na">—</span>';
+  const cls=score>=70?'rel-high':score>=40?'rel-mid':'rel-low';
+  return `<span class="${cls}">${score}%</span>`;
+}
+
+function confHtml(score){
   if(score==null) return '<span class="rel-na">—</span>';
   const cls=score>=70?'rel-high':score>=40?'rel-mid':'rel-low';
   return `<span class="${cls}">${score}%</span>`;
@@ -1343,8 +1371,10 @@ function badgeHtml(p) {
 function updateBadgeRow(p) {
   const dec=document.getElementById(`dec-${p.pmid}`);
   const rsn=document.getElementById(`rsn-${p.pmid}`);
+  const conf=document.getElementById(`conf-${p.pmid}`);
   if(dec) dec.innerHTML=badgeHtml(p);
   if(rsn) rsn.textContent=p.aiReason;
+  if(conf) conf.innerHTML=confHtml(p.confidenceScore??null);
   updatePapersCount();
 }
 
@@ -1607,6 +1637,7 @@ function renderExportTable() {
       <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
       <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
       <td><span class="badge ${BADGE_CLASSES[fd]||''}">${fd||'—'}</span></td>
+      <td style="text-align:center">${confHtml(p.confidenceScore??null)}</td>
       <td class="col-rsn">${esc(p.aiReason)}</td>`;
     tbody.appendChild(tr);
   });
@@ -1617,10 +1648,10 @@ function csvField(v){ return '"'+String(v??'').replace(/"/g,'""')+'"'; }
 
 function exportCSV() {
   const hdr=['PMID','Title','Authors','Year','Journal','DOI','Abstract','Source',
-             'Relevance (%)','AI Decision','AI Reason','Manual Override','Final Decision'];
+             'Relevance (%)','AI Decision','AI Confidence (%)','AI Reason','Manual Override','Final Decision'];
   const rows=state.papers.map(p=>[
     p.pmid,p.title,p.authors,p.year,p.journal,p.doi,p.abstract,p.source||'',
-    p.relevanceScore??'',p.aiDecision,p.aiReason,p.manualDecision,finalDecision(p)
+    p.relevanceScore??'',p.aiDecision,p.confidenceScore??'',p.aiReason,p.manualDecision,finalDecision(p)
   ].map(csvField).join(','));
   dlFile([hdr.join(','),...rows].join('\r\n'),'systematic_review_results.csv','text/csv');
   showToast('CSV downloaded.','success');
@@ -2234,7 +2265,8 @@ function saveSession() {
     papers:state.papers.map(p=>({
       pmid:p.pmid,title:p.title,authors:p.authors,year:p.year,
       journal:p.journal,doi:p.doi,abstract:p.abstract,source:p.source||'',
-      aiDecision:p.aiDecision,aiReason:p.aiReason,manualDecision:p.manualDecision,
+      aiDecision:p.aiDecision,aiReason:p.aiReason,confidenceScore:p.confidenceScore??null,
+      manualDecision:p.manualDecision,
       verifyDecision:p.verifyDecision||'',verifyReason:p.verifyReason||''
     }))
     // API keys and model selections intentionally excluded
@@ -2263,6 +2295,7 @@ function loadSession(input) {
       }));
       if(state.query) document.getElementById('query').value=state.query;
       if(state.criteria) document.getElementById('criteria-text').value=state.criteria;
+      computeRelevanceScores();
       renderPapersTable();
       updatePapersCount();
       document.getElementById('btn-save').disabled=false;

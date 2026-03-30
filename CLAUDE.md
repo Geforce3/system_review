@@ -252,13 +252,25 @@ These patterns must be followed to maintain XSS safety. Violations are subtle an
 - Clean, professional light color scheme
 - Per-database breakdown in PRISMA flow section
 
-### Relevance Score
-- `paper.relevanceScore` — integer 0–100, set by `screenOne()` during the AI screening pass; `null` for skipped papers (no abstract)
-- Stored as a field on each paper and included in CSV export under column `Relevance (%)`
-- Displayed in both the screening table and export table; rendered by `relHtml(score)` helper
+### Relevance Score (keyword-based)
+- `paper.relevanceScore` — integer 0–100, computed client-side by `computeRelevanceScores()` immediately after `searchAll()` deduplicates results; **does not require AI**
+- Also recomputed by `loadSession()` so saved sessions always have fresh scores
+- Formula: `Math.min(100, Math.round((titleHits×2 + abstractHits) / (terms.length×3) × 100))` — title matches weighted 2×
+- Terms: `state.query` tokenised (lowercase, split on whitespace/operators, stop-words removed, min 3 chars)
+- `null` if no query terms remain after filtering; shown as `—`
+- Visible immediately when results load — **independent of inclusion/exclusion criteria**
+- Displayed in both the screening and export tables; rendered by `relHtml(score)` helper
+- Included in CSV export as `Relevance (%)`; **not** persisted in JSON session (always recomputed from query)
 - CSS classes: `.rel-high` (≥70, green), `.rel-mid` (40–69, amber), `.rel-low` (<40, red), `.rel-na` (null, muted)
-- The AI is given `state.query` in the `screenOne()` prompt so it can assess topical relevance to the original search terms, independent of the inclusion/exclusion decision
-- If verification re-runs papers, `relevanceScore` is not overwritten (set only during initial screening)
+
+### AI Confidence Score (screening-based)
+- `paper.confidenceScore` — integer 0–100, set by `screenOne()` alongside `aiDecision`; **requires AI**
+- Reflects how clearly the abstract matches or fails the inclusion criteria (100 = unambiguous, low = abstract is vague/off-topic/insufficient)
+- `null` for skipped papers (no abstract) and on AI error; shown as `—`
+- Updated live in the screening table as each paper is screened (`updateBadgeRow()` refreshes `#conf-<pmid>`)
+- Displayed in both the screening and export tables; rendered by `confHtml(score)` helper (same colour scale as `relHtml`)
+- Included in CSV export as `AI Confidence (%)`; persisted in JSON session under `confidenceScore`
+- Use low-confidence papers as a prioritised manual review queue
 
 ### MeSH Term Checker
 - `checkMeshTerms()` — looks up NCBI MeSH descriptors for key terms extracted from the user's query
