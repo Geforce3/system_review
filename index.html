@@ -1316,8 +1316,11 @@ function computeRelevanceScores() {
   state.papers.forEach(p => {
     const title    = p.title.toLowerCase();
     const abstract = p.abstract.toLowerCase();
-    const titleHits    = terms.filter(t => title.includes(t)).length;
-    const abstractHits = terms.filter(t => abstract.includes(t)).length;
+    let titleHits=0, abstractHits=0;
+    for(const t of terms){
+      if(title.includes(t))    titleHits++;
+      if(abstract.includes(t)) abstractHits++;
+    }
     // Title match weighted 2×; max possible = 3 pts per term
     p.relevanceScore = Math.min(100, Math.round((titleHits * 2 + abstractHits) / (terms.length * 3) * 100));
   });
@@ -1347,20 +1350,14 @@ function buildRow(p,i) {
     </td>
     <td class="col-auth">${esc(trunc(p.authors,55))}<br><small>${esc(p.year)}</small></td>
     <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
-    <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
+    <td style="text-align:center">${scoreHtml(p.relevanceScore??null)}</td>
     <td class="col-dec" id="dec-${p.pmid}">${badgeHtml(p)}</td>
-    <td style="text-align:center" id="conf-${p.pmid}">${confHtml(p.confidenceScore??null)}</td>
+    <td style="text-align:center" id="conf-${p.pmid}">${scoreHtml(p.confidenceScore??null)}</td>
     <td class="col-rsn" id="rsn-${p.pmid}">${esc(p.aiReason)}</td>`;
   return tr;
 }
 
-function relHtml(score){
-  if(score==null) return '<span class="rel-na">—</span>';
-  const cls=score>=70?'rel-high':score>=40?'rel-mid':'rel-low';
-  return `<span class="${cls}">${score}%</span>`;
-}
-
-function confHtml(score){
+function scoreHtml(score){
   if(score==null) return '<span class="rel-na">—</span>';
   const cls=score>=70?'rel-high':score>=40?'rel-mid':'rel-low';
   return `<span class="${cls}">${score}%</span>`;
@@ -1381,7 +1378,7 @@ function updateBadgeRow(p) {
   const conf=document.getElementById(`conf-${p.pmid}`);
   if(dec) dec.innerHTML=badgeHtml(p);
   if(rsn) rsn.textContent=p.aiReason;
-  if(conf) conf.innerHTML=confHtml(p.confidenceScore??null);
+  if(conf) conf.innerHTML=scoreHtml(p.confidenceScore??null);
   updatePapersCount();
 }
 
@@ -1642,9 +1639,9 @@ function renderExportTable() {
       <td class="col-auth">${esc(trunc(p.authors,40))}<br><small>${esc(p.year)}</small></td>
       <td>${esc(trunc(p.journal,40))}</td>
       <td><span class="src-badge ${dbSrcClass(p.source?.split('+')[0]||'')}">${esc(srcLabel(p.source||''))}</span></td>
-      <td style="text-align:center">${relHtml(p.relevanceScore??null)}</td>
+      <td style="text-align:center">${scoreHtml(p.relevanceScore??null)}</td>
       <td><span class="badge ${BADGE_CLASSES[fd]||''}">${fd||'—'}</span></td>
-      <td style="text-align:center">${confHtml(p.confidenceScore??null)}</td>
+      <td style="text-align:center">${scoreHtml(p.confidenceScore??null)}</td>
       <td class="col-rsn">${esc(p.aiReason)}</td>`;
     tbody.appendChild(tr);
   });
@@ -2360,8 +2357,8 @@ function onModelModeChange(){
     if(lbl) lbl.innerHTML='AI model <span class="opt-tag">(all tasks)</span>';
     if(hint) hint.textContent='Single model used for all AI tasks.';
     // Mirror analysis model to screening and verification when in single mode
-    state.screeningModel = document.getElementById('analysis-model')?.value || MODEL_SMART;
-    state.verifyModel    = state.screeningModel;
+    const m = document.getElementById('analysis-model')?.value || MODEL_SMART;
+    state.screeningModel = state.verifyModel = m;
   }
 }
 
