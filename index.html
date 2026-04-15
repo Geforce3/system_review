@@ -735,15 +735,22 @@ const MODELS = [
 function getProvider(modelId){ return (MODELS.find(m=>m.id===modelId)||{provider:'claude'}).provider; }
 
 // ── State ───────────────────────────────────────────────────────
+// Returns the resettable (non-key) defaults. Keys are preserved on restart.
+function stateDefaults() {
+  return {
+    query:'', maxResults:100,
+    papers:[], criteria:'', batchSize:10,
+    screeningActive:false, screeningPaused:false, stopRequested:false,
+    screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1,
+    identifiedCount:0, dupesRemoved:0, dbCounts:{},
+    modelMode:'single', screeningModel:MODEL_FAST, analysisModel:MODEL_SMART, verifyModel:MODEL_SMART,
+    verifyStopRequested:false, verifyActive:false
+  };
+}
+
 const state = {
   apiKey:'', ncbiKey:'', openaiKey:'', geminiKey:'',
-  query:'', maxResults:100,
-  papers:[], criteria:'', batchSize:10,
-  screeningActive:false, screeningPaused:false, stopRequested:false,
-  screenedCount:0, rawSynthesis:'', currentStage:1, maxStageReached:1,
-  identifiedCount:0, dupesRemoved:0, dbCounts:{},
-  modelMode:'single', screeningModel:MODEL_FAST, analysisModel:MODEL_SMART, verifyModel:MODEL_SMART,
-  verifyStopRequested:false
+  ...stateDefaults()
 };
 let overridePmid = null;
 
@@ -1396,12 +1403,15 @@ function updateProgress(done,total) {
 }
 
 function updatePapersCount() {
-  const t=state.papers.length;
-  const inc=state.papers.filter(p=>finalDecision(p)==='include').length;
-  const exc=state.papers.filter(p=>finalDecision(p)==='exclude').length;
-  const unc=state.papers.filter(p=>finalDecision(p)==='uncertain').length;
+  const {inc,exc,unc}=state.papers.reduce((a,p)=>{
+    const d=finalDecision(p);
+    if(d==='include') a.inc++;
+    else if(d==='exclude') a.exc++;
+    else if(d==='uncertain') a.unc++;
+    return a;
+  },{inc:0,exc:0,unc:0});
   const el=document.getElementById('papers-count');
-  if(el) el.textContent=`${t} total · ${inc} included · ${exc} excluded · ${unc} uncertain`;
+  if(el) el.textContent=`${state.papers.length} total · ${inc} included · ${exc} excluded · ${unc} uncertain`;
 }
 
 // ── Override menu ────────────────────────────────────────────────
@@ -1528,13 +1538,10 @@ function renderPrismaFlowchart() {
 }
 
 function renderPrismaReasons() {
-  const d = computePrisma();
+  const {d, dbCounts} = assemblePrismaData();
   const el = document.getElementById('prisma-reasons');
   const entries = Object.entries(d.reasons).sort((a,b)=>b[1]-a[1]);
   const maxN = entries[0]?.[1] || 1;
-
-  // Per-DB breakdown
-  const dbCounts = state.dbCounts || {};
   const dbRows = Object.entries(dbCounts).filter(([,n])=>n>0).map(([db,n])=>
     `<div class="rsn-row">
        <span><span class="src-badge ${dbSrcClass(db)}">${dbLabel(db)}</span></span>
@@ -1876,6 +1883,10 @@ function renderMarkdown(md) {
 
 // ── Navigation ───────────────────────────────────────────────────
 function goToStage(n) {
+  if(n===3 && state.verifyActive){
+    showToast('Verification is still running — please wait or stop it first.','error');
+    return;
+  }
   document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
   document.getElementById(`stage-${n}`).classList.add('active');
   // Track highest stage reached for clickable steps
@@ -1890,10 +1901,6 @@ function goToStage(n) {
   }
   state.currentStage=n;
   if(n===3){
-    if(state.verifyActive){
-      showToast('Verification is still running — please wait or stop it first.','error');
-      return;
-    }
     // Clear session-specific outputs so stale results don't persist on re-entry
     const vc=document.getElementById('verify-out');
     if(vc){ vc.innerHTML=''; vc.style.display='none'; }
@@ -1968,21 +1975,8 @@ function confirmRestart(){
 }
 
 function restartApp(){
-  // Clear all paper/screening/synthesis state
-  state.papers = [];
-  state.criteria = '';
-  state.rawSynthesis = '';
-  state.query = '';
-  state.maxResults = 100;
-  state.screeningActive = false;
-  state.screeningPaused = false;
-  state.stopRequested = false;
-  state.screenedCount = 0;
-  state.maxStageReached = 1;
-  state.identifiedCount       = 0;
-  state.dupesRemoved          = 0;
-  state.dbCounts              = {};
-  state.verifyStopRequested   = false;
+  // Reset all non-key state fields; API keys are preserved
+  Object.assign(state, stateDefaults());
   // Reset UI elements
   const q = document.getElementById('query');
   if(q) q.value = '';

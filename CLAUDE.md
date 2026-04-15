@@ -3,6 +3,24 @@
 ## Project Context
 This is a systematic literature review assistant that works entirely in the browser. It integrates with multiple academic databases and Claude API (key required) to help researchers search, screen, export, and synthesise academic papers.
 
+## Workflow Rules
+
+### Before Development
+- **Always create a plan first** and present it to the user for approval before writing any code.
+- The plan should cover: what will change, which functions/sections are affected, and any security or state-management implications.
+- Do not proceed with implementation until the user explicitly approves the plan.
+
+### Before Pushing to Git
+- **Run a bug sweep**: check for the patterns listed in `bugs.md` and the "Common Bugs to Avoid" section below.
+- **Run a security sweep**: verify all dynamic values are escaped correctly per the "Security Patterns" section; check for new `innerHTML`, `setStatus`, or `showModal` usages that might be unsafe.
+- Only push after both sweeps are clean or all findings are resolved.
+
+### Bug Tracking
+- `bugs.md` (project root) is the canonical list of known bugs and lessons learned.
+- Add a new entry to `bugs.md` whenever a bug is found or fixed during development or review.
+
+---
+
 ## Critical Rules
 
 ### API Configuration
