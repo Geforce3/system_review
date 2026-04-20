@@ -1,6 +1,7 @@
 'use strict';
 const express   = require('express');
 const basicAuth = require('express-basic-auth');
+const rateLimit = require('express-rate-limit');
 const https     = require('https');
 const path      = require('path');
 
@@ -23,6 +24,15 @@ app.use(basicAuth({
   realm: 'Systematic Review Assistant'
 }));
 
+// ── Rate limiter: max 10 S2 proxy calls per IP per minute ────────
+const s2Limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests — please wait before searching again.' }
+});
+
 // ── Semantic Scholar proxy ────────────────────────────────────────
 // Semantic Scholar blocks direct browser calls (CORS). This route
 // forwards the request server-side and returns the JSON response.
@@ -42,7 +52,7 @@ function s2Request(options) {
   });
 }
 
-app.get('/api/semantic-scholar', async (req, res) => {
+app.get('/api/semantic-scholar', s2Limiter, async (req, res) => {
   const query  = req.query.query;
   const limit  = Math.min(parseInt(req.query.limit) || 100, 100);
   // API key comes from a request header, not a query param, to avoid log exposure
